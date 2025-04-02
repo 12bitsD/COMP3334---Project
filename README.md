@@ -57,14 +57,3 @@
 ## 开发环境设置
 
 ### 客户端环境设置
-
-```bash
-# 克隆仓库
-git clone <repository-url>
-cd COMP3334---Project/client
-
-# 安装依赖
-npm install
-
-# 启动开发服务器
-npm start
