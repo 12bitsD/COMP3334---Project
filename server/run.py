@@ -28,7 +28,7 @@ def create_app(config_name='default'):
     return app
 
 if __name__ == '__main__':
-    app = create_app(os.getenv('FLASK_ENV', 'development'))
+    app = create_app( 'development')
     
     # 确保实例文件夹存在
     if not os.path.exists('instance'):
