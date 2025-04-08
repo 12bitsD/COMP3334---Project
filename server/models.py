@@ -22,13 +22,3 @@ class Message(db.Model):
     signature = db.Column(db.Text, nullable=False)  # 数字签名
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(20), default='sent')  # 消息状态：sent, delivered, read
-
-class Session(db.Model):
-    __tablename__ = 'sessions'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    token = db.Column(db.String(500), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    expires_at = db.Column(db.DateTime, nullable=False)
-    is_active = db.Column(db.Boolean, default=True)

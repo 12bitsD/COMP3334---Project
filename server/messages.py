@@ -6,6 +6,7 @@ from datetime import datetime
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Signature import pkcs1_15
+from Crypto.Cipher import PKCS1_OAEP
 import base64
 
 messages_bp = Blueprint('messages', __name__)
@@ -18,6 +19,15 @@ def verify_signature(message_hash, signature, public_key):
         return True
     except (ValueError, TypeError):
         return False
+
+def decrypt_message(encrypted_content, private_key):
+    try:
+        key = RSA.import_key(private_key)
+        cipher = PKCS1_OAEP.new(key)
+        decrypted_content = cipher.decrypt(base64.b64decode(encrypted_content))
+        return decrypted_content.decode()
+    except Exception as e:
+        return None
 
 @messages_bp.route('/send', methods=['POST'])
 @token_required
