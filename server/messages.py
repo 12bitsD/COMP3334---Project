@@ -1,7 +1,6 @@
 from flask import Blueprint, request, jsonify
 from models import Message, User, MessagePermission
 from app import db
-from auth import token_required
 from datetime import datetime
 import base64
 
@@ -43,182 +42,177 @@ def check_message_permission(user_id, message_id, required_permission='read'):
     return False, 'Insufficient permission'
 
 @messages_bp.route('/send', methods=['POST'])
-@token_required
-def send_message(current_user):
+def send_message():
     """Send an encrypted message to another user.
-    Args:
-        current_user: The authenticated user sending the message
+    Expects JSON with user_id, receiver_id, and encrypted_content.
     Returns:
         JSON response with message status and details
     """
     data = request.get_json()
     
-    if not data or not all(k in data for k in ['receiver_id', 'encrypted_content']):
-        return jsonify({'message': 'Missing required message information'}), 400
+    # 从请求中获取发送者ID和接收者ID
+    sender = User.query.filter_by(user_id=data['user_id']).first()
+    if not sender:
+        return jsonify({'message': 'Sender not found', 'status': 'error'}), 404
         
     receiver = User.query.filter_by(user_id=data['receiver_id']).first()
     if not receiver:
-        return jsonify({'message': 'Receiver not found'}), 404
+        return jsonify({'message': 'Receiver not found', 'status': 'error'}), 404
     
     new_message = Message(
-        sender_id=current_user.id,
+        sender_id=sender.id,
         receiver_id=receiver.id,
         encrypted_content=data['encrypted_content']
     )
     
-    try:
-        # 创建消息
-        db.session.add(new_message)
-        db.session.commit()
-        return jsonify({
-            'message': 'Message sent successfully',
-            'message_id': new_message.id,
-            'timestamp': new_message.timestamp.isoformat()
-        }), 201
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'message': 'Failed to send message'}), 500
+    # 创建消息
+    db.session.add(new_message)
+    db.session.commit()
+    return jsonify({
+        'message': 'Message sent successfully',
+        'message_id': new_message.id,
+        'timestamp': new_message.timestamp.isoformat(),
+        'status': 'success'
+    }), 201
 
 @messages_bp.route('/inbox', methods=['GET'])
-@token_required
-def get_inbox(current_user):
+def get_inbox():
     """Retrieve all messages in the user's inbox including those with granted permissions.
-    Args:
-        current_user: The authenticated user requesting their inbox
+    Expects query parameter user_id.
     Returns:
         JSON response with list of messages
     """
-    try:
-        # 获取用户作为接收者的消息
-        received_messages = Message.query.filter_by(receiver_id=current_user.id)
+    # 从请求参数获取用户ID
+    user_id = request.args.get('user_id')
+    user = User.query.filter_by(user_id=user_id).first()
+    if not user:
+        return jsonify({'message': 'User not found', 'status': 'error'}), 404
         
-        # 获取用户有权限访问的其他消息
-        permitted_messages = Message.query.join(MessagePermission).filter(
-            MessagePermission.user_id == current_user.id,
-            MessagePermission.permission_type.in_(['read', 'write', 'admin'])
-        )
-        
-        # 合并两种消息并按时间排序
-        messages = received_messages.union(permitted_messages).order_by(Message.timestamp.desc()).all()
-        
-        return jsonify({
-            'messages': [{
-                'id': msg.id,
-                'sender_id': User.query.get(msg.sender_id).user_id,
-                'encrypted_content': msg.encrypted_content,
-                'timestamp': msg.timestamp.isoformat()
-            } for msg in messages]
-        }), 200
-    except Exception as e:
-        return jsonify({'message': 'Failed to get inbox'}), 500
+    # 获取用户作为接收者的消息
+    received_messages = Message.query.filter_by(receiver_id=user.id)
+    
+    # 获取用户有权限访问的其他消息
+    permitted_messages = Message.query.join(MessagePermission).filter(
+        MessagePermission.user_id == user.id,
+        MessagePermission.permission_type.in_(['read', 'write', 'admin'])
+    )
+    
+    # 合并两种消息并按时间排序
+    messages = received_messages.union(permitted_messages).order_by(Message.timestamp.desc()).all()
+    
+    return jsonify({
+        'messages': [{
+            'id': msg.id,
+            'sender_id': User.query.get(msg.sender_id).user_id if User.query.get(msg.sender_id) else 'Unknown',
+            'encrypted_content': msg.encrypted_content,
+            'timestamp': msg.timestamp.isoformat()
+        } for msg in messages],
+        'status': 'success'
+    }), 200
 
 @messages_bp.route('/outbox', methods=['GET'])
-@token_required
-def get_outbox(current_user):
+def get_outbox():
     """Retrieve all messages sent by the user.
-    Args:
-        current_user: The authenticated user requesting their outbox
+    Expects query parameter user_id.
     Returns:
         JSON response with list of sent messages
     """
-    try:
-        messages = Message.query.filter_by(
-            sender_id=current_user.id
-        ).order_by(Message.timestamp.desc()).all()
+    # 从请求参数获取用户ID
+    user_id = request.args.get('user_id')
+    user = User.query.filter_by(user_id=user_id).first()
+    if not user:
+        return jsonify({'message': 'User not found', 'status': 'error'}), 404
         
-        return jsonify({
-            'messages': [{
-                'id': msg.id,
-                'receiver_id': User.query.get(msg.receiver_id).user_id,
-                'encrypted_content': msg.encrypted_content,
-                'timestamp': msg.timestamp.isoformat()
-            } for msg in messages]
-        }), 200
-    except Exception as e:
-        return jsonify({'message': 'Failed to get outbox'}), 500
+    messages = Message.query.filter_by(
+        sender_id=user.id
+    ).order_by(Message.timestamp.desc()).all()
+    
+    return jsonify({
+        'messages': [{
+            'id': msg.id,
+            'receiver_id': User.query.get(msg.receiver_id).user_id if User.query.get(msg.receiver_id) else 'Unknown',
+            'encrypted_content': msg.encrypted_content,
+            'timestamp': msg.timestamp.isoformat()
+        } for msg in messages],
+        'status': 'success'
+    }), 200
 
 @messages_bp.route('/message/<int:message_id>/permission', methods=['POST'])
-@token_required
-def grant_permission(current_user, message_id):
+def grant_permission(message_id):
     """Grant message access permission to another user.
-    Args:
-        current_user: The authenticated user granting permission
-        message_id: The ID of the message to grant permission for
+    Expects JSON with user_id (grantor) and target_user_id (grantee) and permission_type.
     Returns:
         JSON response with permission status
     """
     data = request.get_json()
-    if not data or not all(k in data for k in ['user_id', 'permission_type']):
-        return jsonify({'message': 'Missing required permission information'}), 400
+    
+    # 从请求中获取授权用户ID
+    user_id = data['user_id']
+    user = User.query.filter_by(user_id=user_id).first()
+    if not user:
+        return jsonify({'message': 'User not found', 'status': 'error'}), 404
     
     # 检查授权者是否有管理权限
-    has_permission, error_msg = check_message_permission(current_user.id, message_id, 'admin')
+    has_permission, error_msg = check_message_permission(user.id, message_id, 'admin')
     if not has_permission:
-        return jsonify({'message': error_msg}), 403
+        return jsonify({'message': error_msg, 'status': 'error'}), 403
     
-    target_user = User.query.filter_by(user_id=data['user_id']).first()
+    target_user = User.query.filter_by(user_id=data['target_user_id']).first()
     if not target_user:
-        return jsonify({'message': 'Target user not found'}), 404
+        return jsonify({'message': 'Target user not found', 'status': 'error'}), 404
     
-    try:
-        # 检查是否已存在权限记录
-        existing_permission = MessagePermission.query.filter_by(
+    # 检查是否已存在权限记录
+    existing_permission = MessagePermission.query.filter_by(
+        message_id=message_id,
+        user_id=target_user.id
+    ).first()
+    
+    if existing_permission:
+        existing_permission.permission_type = data['permission_type']
+    else:
+        new_permission = MessagePermission(
             message_id=message_id,
-            user_id=target_user.id
-        ).first()
-        
-        if existing_permission:
-            existing_permission.permission_type = data['permission_type']
-        else:
-            new_permission = MessagePermission(
-                message_id=message_id,
-                user_id=target_user.id,
-                permission_type=data['permission_type'],
-                granted_by=current_user.id
-            )
-            db.session.add(new_permission)
-        
-        db.session.commit()
-        return jsonify({'message': 'Permission granted successfully'}), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'message': 'Failed to grant permission'}), 500
+            user_id=target_user.id,
+            permission_type=data['permission_type'],
+            granted_by=user.id
+        )
+        db.session.add(new_permission)
+    
+    db.session.commit()
+    return jsonify({'message': 'Permission granted successfully', 'status': 'success'}), 200
 
 @messages_bp.route('/message/<int:message_id>/permission', methods=['DELETE'])
-@token_required
-def revoke_permission(current_user, message_id):
+def revoke_permission(message_id):
     """Revoke message access permission from a user.
-    Args:
-        current_user: The authenticated user revoking permission
-        message_id: The ID of the message to revoke permission for
+    Expects JSON with user_id (revoker) and target_user_id (revokee).
     Returns:
         JSON response with permission status
     """
     data = request.get_json()
-    if not data or 'user_id' not in data:
-        return jsonify({'message': 'Missing user information'}), 400
+    
+    # 从请求中获取撤销权限的用户ID
+    user_id = data['user_id']
+    user = User.query.filter_by(user_id=user_id).first()
+    if not user:
+        return jsonify({'message': 'User not found', 'status': 'error'}), 404
     
     # 检查撤销者是否有管理权限
-    has_permission, error_msg = check_message_permission(current_user.id, message_id, 'admin')
+    has_permission, error_msg = check_message_permission(user.id, message_id, 'admin')
     if not has_permission:
-        return jsonify({'message': error_msg}), 403
+        return jsonify({'message': error_msg, 'status': 'error'}), 403
     
-    target_user = User.query.filter_by(user_id=data['user_id']).first()
+    target_user = User.query.filter_by(user_id=data['target_user_id']).first()
     if not target_user:
-        return jsonify({'message': 'Target user not found'}), 404
+        return jsonify({'message': 'Target user not found', 'status': 'error'}), 404
     
-    try:
-        permission = MessagePermission.query.filter_by(
-            message_id=message_id,
-            user_id=target_user.id
-        ).first()
-        
-        if permission:
-            db.session.delete(permission)
-            db.session.commit()
-            return jsonify({'message': 'Permission revoked successfully'}), 200
-        else:
-            return jsonify({'message': 'Permission record not found'}), 404
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'message': 'Failed to revoke permission'}), 500
+    permission = MessagePermission.query.filter_by(
+        message_id=message_id,
+        user_id=target_user.id
+    ).first()
+    
+    if permission:
+        db.session.delete(permission)
+        db.session.commit()
+        return jsonify({'message': 'Permission revoked successfully', 'status': 'success'}), 200
+    else:
+        return jsonify({'message': 'Permission record not found', 'status': 'error'}), 404

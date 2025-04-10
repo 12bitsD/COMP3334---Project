@@ -33,21 +33,21 @@ default_limits=["200 per day", "50 per hour"]
 def ratelimit_handler(e):
     return jsonify({
         'status': 'error',
-        'message': '请求过于频繁，请稍后再试'
+        'message': 'Too many requests, please try again later'
     }), 429
 
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({
         'status': 'error',
-        'message': '请求的资源不存在'
+        'message': 'The requested resource does not exist'
     }), 404
 
 @app.errorhandler(500)
 def internal_error(e):
     return jsonify({
         'status': 'error',
-        'message': '服务器内部错误'
+        'message': 'Internal server error'
     }), 500
 
 if __name__ == '__main__':
