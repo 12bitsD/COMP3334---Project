@@ -3,10 +3,13 @@ import json
 import sys
 import socket
 import config
+import requests
 
 username = config.GLOBAL_CONFIG['username']
 password = config.GLOBAL_CONFIG['password']
 loginStatus = config.GLOBAL_CONFIG['loginStatus']
+
+base_url = "http://localhost:5000"
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect(("127.0.0.1",8080))
@@ -69,7 +72,7 @@ def register(args):
     if args.password != args.confirm_password:
         print("password mismatch, please try again")
     else:
-        print(f"Registering user: {args.username}")
+        print(f"Registering user: {args.username}......")
         pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
         usrnm = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
         data = {"action": "register", "username": usrnm, "password": pwd, "email": args.email}
