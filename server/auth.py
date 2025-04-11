@@ -1,6 +1,6 @@
 # Authentication Blueprint for handling user registration, login
 from flask import Blueprint, request, jsonify, current_app
-from models import User, AuditLog, db, UserSession
+from models import User, AuditLog, db
 from datetime import datetime, UTC, timedelta
 import pyotp
 import hashlib
@@ -127,7 +127,13 @@ def verify_user_credentials(user_id, password_hash):
     # 验证成功情况2: OTP匹配且未过期
     otp_correct = False
     if user.otp is not None and user.otp_expires_at is not None:
-        if datetime.now(UTC) <= user.otp_expires_at and user.otp == password_hash:
+        now = datetime.now(UTC)
+        expires_at = user.otp_expires_at
+        # 确保两个时间都带有时区信息
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+            
+        if now <= expires_at and user.otp == password_hash:
             otp_correct = True
             # OTP验证成功后清除OTP
             user.otp = None
@@ -297,8 +303,8 @@ def get_public_key():
 @auth_bp.route('/reset', methods=['POST'])
 def change_password():
     """修改用户密码
-    Expects JSON with user_id, current_password_hash, and new_password_hash fields.
-    可选字段: signature, operation_data
+    Expects JSON with user_id, current_password_hash, and password_hash fields.
+    可选字段: signature
     """
     data = request.get_json()
     
@@ -314,8 +320,8 @@ def change_password():
         }), status_code
     
     try:
-        # 更新密码哈希
-        user.password_hash = data['new_password_hash']
+        # 更新密码哈希 - 使用password_hash字段
+        user.password_hash = data['password_hash']  # 修改这里，使用password_hash字段
         db.session.commit()
         
         # 记录密码更改

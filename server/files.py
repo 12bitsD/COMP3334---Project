@@ -15,21 +15,51 @@ files_bp = Blueprint('files', __name__)
 def upload_file():
     """上传加密文件
     Expects JSON with:
-        - username: 加密的用户名
-        - auth: 密码哈希
+        - user_id/username: 用户ID 
+        - password_hash/auth: 密码哈希
         - filename: 加密的文件名
         - encrypted_content: 加密的文件内容
-        - hmac: HMAC验证码
+        - signature/hmac: 客户端签名
     """
     data = request.get_json()
     
     try:
-        user = User.query.filter_by(user_id=data['username']).first()
+        # 支持两种参数命名风格
+        user_id = data.get('user_id') or data.get('username')
+        if not user_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing user_id/username parameter'
+            }), 400
+            
+        user = User.query.filter_by(user_id=user_id).first()
+        if not user:
+            return jsonify({
+                'status': 'error',
+                'message': 'User not found'
+            }), 404
+            
+        # 检查文件名
+        filename = data.get('filename')
+        if not filename:
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing filename parameter'
+            }), 400
+            
+        # 检查加密内容
+        encrypted_content = data.get('encrypted_content')
+        if not encrypted_content:
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing encrypted_content parameter'
+            }), 400
+            
         # 创建新文件
         new_file = File(
-            filename=data['filename'],
+            filename=filename,
             owner_id=user.id,
-            encrypted_content=data['encrypted_content']
+            encrypted_content=encrypted_content
         )
         db.session.add(new_file)
         db.session.commit()
@@ -50,9 +80,11 @@ def upload_file():
         }), 201
             
     except Exception as e:
+        db.session.rollback()
+        print(f"文件上传错误: {str(e)}")  # 在服务器日志中记录详细错误
         return jsonify({
             'status': 'error',
-            'message': 'Failed to upload file'
+            'message': f'Failed to upload file: {str(e)}'
         }), 500
 
 @files_bp.route('/download', methods=['GET'])
@@ -88,6 +120,7 @@ def download_file_by_name():
         }), 200
                 
     except Exception as e:
+        print(f"文件下载错误: {str(e)}")  # 在服务器日志中记录详细错误
         return jsonify({
             'status': 'error',
             'message': 'Failed to download file'
@@ -275,9 +308,8 @@ def update_file():
         user = User.query.filter_by(user_id=data['username']).first()
         F = File.query.filter_by(owner_id=user.id, filename=data['filename']).first()
         
-        # 更新文件内容
+        # 更新文件内容，不使用updated_at字段
         F.encrypted_content = data['encrypted_content']
-        F.updated_at = datetime.now(UTC)
         db.session.commit()
         
         # 记录文件更新操作
@@ -300,48 +332,3 @@ def update_file():
             'status': 'error',
             'message': 'Failed to update file'
         }), 500
-
-@files_bp.route('/pending_shares', methods=['GET'])
-def get_pending_shares():
-    """获取用户的待共享文件
-    Expects query parameters:
-        - username: 加密的用户名
-        - auth: 密码哈希
-    """
-    username = request.args.get('username')
-    auth = request.args.get('auth')
-    
-    try:
-        user = User.query.filter_by(user_id=username).first()
-        
-        # 查找所有等待确认的文件共享请求
-        pending_shares = FileShare.query.filter_by(
-            shared_with_id=user.id,
-            is_confirmed=False
-        ).all()
-        
-        # 构建响应
-        pending_shares_data = [{
-            'file_id': share.file_id,
-            'shared_by': User.query.get(File.query.get(share.file_id).owner_id).user_id,
-            'shared_at': share.shared_at.isoformat()
-        } for share in pending_shares]
-        
-        # 记录查询操作
-        log_action(
-            user.id,
-            'check_pending_shares',
-            details=f"Checked for pending shares: {len(pending_shares)} found"
-        )
-        
-        return jsonify({
-            'status': 'success',
-            'pending_shares': len(pending_shares) > 0,
-            'shares': pending_shares_data
-        }), 200
-        
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': 'Failed to get pending shares'
-        }), 500 

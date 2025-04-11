@@ -1,13 +1,12 @@
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_mail import Mail
 from config import Config
 import os
+from models import db
 
 # Initialize extensions
-db = SQLAlchemy()
 mail = Mail()
 
 def create_app():
@@ -50,16 +49,21 @@ if __name__ == '__main__':
         from models import User, File, FileShare
         from sqlalchemy import inspect
         
-        inspector = inspect(db.engine)
-        existing_columns = [column['name'] for column in inspector.get_columns('users')]
-        
-        # 确保数据库表结构是最新的
+        # 首先确保数据库表结构是最新的
         db.create_all()
         
-        
-        # 如果表已存在但没有新添加的列，提示用户进行数据迁移
-        if 'users' in inspector.get_table_names() and ('password_hash' not in existing_columns or 'public_key' not in existing_columns):
-            print("警告: 用户表结构已更新，请备份数据并执行迁移!")
+        # 然后才检查列
+        try:
+            inspector = inspect(db.engine)
+            if 'users' in inspector.get_table_names():
+                existing_columns = [column['name'] for column in inspector.get_columns('users')]
+                
+                # 如果表已存在但没有新添加的列，提示用户进行数据迁移
+                if 'password_hash' not in existing_columns or 'public_key' not in existing_columns:
+                    print("警告: 用户表结构已更新，请备份数据并执行迁移!")
+        except Exception as e:
+            print(f"警告: 检查数据库结构时出错: {e}")
+            print("继续启动应用...")
     
     # 启动应用
     app.run(host='0.0.0.0', port=5000)

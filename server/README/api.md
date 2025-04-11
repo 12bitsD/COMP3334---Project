@@ -45,13 +45,6 @@
   - 成功: `{"status": "success", "file": "File updated successfully", "file_id": id}`
   - 失败: `{"status": "error", "message": "Failed to update file"}`
 
-### GET /pending_shares
-- **参数**: `username`, `auth`
-- **调用**: `GET /pending_shares?username=x&auth=y`
-- **响应**:
-  - 成功: `{"status": "success", "pending_shares": boolean, "shares": [...]}`
-  - 失败: `{"status": "error", "message": "Failed to get pending shares"}`
-
 ## 用户认证
 
 ### POST /register
