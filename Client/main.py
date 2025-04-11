@@ -17,30 +17,6 @@ def help(admin=False):
     if admin:
         print("log <username> (print all the log of a specific user)")
 
-def init():
-    with open("keypair.json",'r') as f:
-        keypair = json.load(f)
-        if keypair is None:
-            private_key_pem, public_key_pem = generate_keys()
-            private_key = load_private_key(private_key_pem)
-            public_key = load_public_key(public_key_pem)
-            shared_key = get_shared_key(private_key, public_key)
-            keypair = {
-                'private_key': private_key,
-                'public_key': public_key,
-                'shared_key': shared_key
-            }
-            with open('keypair.json', 'w') as f:
-                json.dump(keypair, f, indent=4)
-        else:
-            private_key = keypair['private_key']
-            public_key = keypair['public_key']
-            shared_key = keypair['shared_key']
-    config.GLOBAL_CONFIG['private_key'] = private_key
-    config.GLOBAL_CONFIG['public_key'] = public_key
-    config.GLOBAL_CONFIG['shared_key'] = shared_key
-
-
 def cmd():
     parser = argparse.ArgumentParser(description="Command-line interface")
     subparsers = parser.add_subparsers(dest="command")
@@ -104,7 +80,7 @@ def cmd():
     while True:
         try:
             if not config.GLOBAL_CONFIG['loginStatus']:
-                print(f"{config.GLOBAL_CONFIG['username']},{config.GLOBAL_CONFIG['password']},{config.GLOBAL_CONFIG['loginStatus']}")
+                #print(f"{config.GLOBAL_CONFIG['username']},{config.GLOBAL_CONFIG['password']},{config.GLOBAL_CONFIG['loginStatus']}")
                 user_input = input("cmd> ")
             else:
                 user_input = input(f"{config.GLOBAL_CONFIG['username']}> ")
@@ -120,10 +96,5 @@ def cmd():
         except Exception as e:
             print(f"Error: {e}")
 
-
-def main():
-    init()
-    cmd()
-
 if __name__ == '__main__':
-    main()
+    cmd()

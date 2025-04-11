@@ -4,9 +4,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 import config
 
-def save_keypair():
-    
-
 def generate_keys():
     """生成 RSA 公私钥对并返回 PEM 格式的 bytes"""
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -56,13 +53,6 @@ def decrypt_with_private_key(ciphertext: bytes, private_key) -> str:
         )
     )
     return plaintext.decode('utf-8')
-
-
-def get_shared_key(data_receive, private_key):
-    encrypted_content = bytes.fromhex(data_receive["cipher_shared_key"])
-    decrypted_shared_key = decrypt_with_private_key(encrypted_content, private_key)
-    shared_key = decrypted_shared_key
-    return shared_key
 
 def sign(message):
     private_key = config.GLOBAL_CONFIG['private_key']

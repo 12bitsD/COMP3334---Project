@@ -1,3 +1,6 @@
 import config
+import json
 
-json.loads(config.GLOBAL_CONFIG)
+with open("keypair.json",'r') as file:
+    kp = json.load(file)
+    print(type(kp['metadata']))
