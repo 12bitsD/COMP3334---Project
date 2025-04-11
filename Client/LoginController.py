@@ -11,7 +11,7 @@ base_url = config.GLOBAL_CONFIG['base_url']
 def init():
     with open("keypair.json",'r') as f:
         keypair = json.load(f)
-        if keypair["metadata"] is None:
+        if keypair['metadata'] is None:
             private_key_pem, public_key_pem = generate_keys()
             private_key = load_private_key(private_key_pem)
             public_key = load_public_key(public_key_pem)
