@@ -4,7 +4,9 @@ from datetime import datetime
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.String(256), unique=True, nullable=False)  # 客户端生成的哈希值
+    user_id = db.Column(db.String(256), unique=True, nullable=False)  # 客户端生成的用户ID哈希值
+    password_hash = db.Column(db.String(256), nullable=False)  # 客户端生成的密码哈希值
+    public_key = db.Column(db.Text, nullable=False)  # 用户的公钥
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     messages_sent = db.relationship('Message', backref='sender', lazy=True, foreign_keys='Message.sender_id')
