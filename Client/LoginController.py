@@ -8,7 +8,7 @@ from CryptographyController import *
 headers = {"Content-Type": "application/json"}
 base_url = config.GLOBAL_CONFIG['base_url']
 
-def init():
+def init(password):
     with open("keypair.json",'r') as f:
         keypair = json.load(f)
         if keypair['metadata'] is None:
@@ -31,16 +31,17 @@ def init():
 
 def reset_password(args):
     suffix = "/auth/change_password"
-    user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
-    pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
-    new_password = hashlib.sha256(f"{args.new_password}".encode("utf-8")).hexdigest()
-    data = {'user_id': user_id,'current_password_hash':pwd,'new_password_hash':new_password}
+    user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest().encode()
+    pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest().encode()
+    new_password = hashlib.sha256(f"{args.new_password}".encode("utf-8")).hexdigest().encode()
+    signature = sign(user_id + pwd + new_password).decode("utf-8")
+    data = {'user_id': user_id,'current_password_hash':pwd,'new_password_hash':new_password,'signature':signature}
     response_raw = requests.post(base_url + suffix, data=json.dumps(data), headers=headers)
     response = response_raw.json()
     print(response['message'])
 
 
-def reset(args):
+def reset(args):   #extra revised needed
     suffix = "/auth/reset"
     user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
     data = {"user_id": user_id}
@@ -95,10 +96,15 @@ def register(args):
         print(f"Registering user: {args.username}")
         pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
         user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
-        data = {"user_id": user_id, "password_hash": pwd, "public_key": config.GLOBAL_CONFIG['public_key'], "email": args.email,}
+        signature = sign(user_id + pwd).decode("utf-8")
+        data = {"user_id": user_id,
+                "password_hash": pwd,
+                "public_key": config.GLOBAL_CONFIG['public_key'],
+                "email": args.email,
+                "signature":signature}
         status = changeStatus(data,args.username,args.password,suffix)
     if status:
-        init()
+        init(args.password)
 
 
 def exit():
@@ -109,7 +115,8 @@ def login(args):
     print(f"{args.username} logging...")
     pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
     user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
-    data = {"user_id": user_id, "password_hash": pwd}
+    signature = sign(user_id + pwd).decode("utf-8")
+    data = {"user_id": user_id, "password_hash": pwd,"signature":signature}
     changeStatus(data,args.username,args.password,suffix)
 
 def log(args):
