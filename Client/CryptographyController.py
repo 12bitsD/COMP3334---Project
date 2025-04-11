@@ -1,40 +1,11 @@
-import os
-
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives.ciphers import modes, algorithms, Cipher
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import config
 
-
-def derive_key(password, salt):
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100000,
-        backend=default_backend()
-    )
-    return kdf.derive(password.encode())
-
-def enc(data):
-    iv = os.urandom(16)
-    key = config.GLOBAL_CONFIG['key']
-    padder = padding.PKCS7(128).padder()
-    padded_data = padder.update(data) + padder.finalize()
-
-    # 创建加密器
-    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
-    encryptor = cipher.encryptor()
-
-    # 加密数据
-    encrypted_data = encryptor.update(padded_data) + encryptor.finalize()
-
-    return (encrypted_data, salt, iv)
-
+def save_keypair():
+    
 
 def generate_keys():
     """生成 RSA 公私钥对并返回 PEM 格式的 bytes"""
@@ -93,3 +64,14 @@ def get_shared_key(data_receive, private_key):
     shared_key = decrypted_shared_key
     return shared_key
 
+def sign(message):
+    private_key = config.GLOBAL_CONFIG['private_key']
+    signature = private_key.sign(
+        message,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+    return signature

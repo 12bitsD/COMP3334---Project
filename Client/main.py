@@ -1,44 +1,45 @@
-import os
-
 from FileController import *
 from LoginController import *
 import argparse
 import shlex
-import socket
-import threading
 import config
 
-listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-listener.bind(("127.0.0.1",10022))
-listener.listen(1)
+def help(admin=False):
+    print("register <username> <password> <confirm_password> <email_address> (register a user)")
+    print("login <username> <password> (login with username and password)")
+    print("reset <username> <password> (reset the password of a user)")
+    print("upload <from_file_path> <to_file_path> (upload file from local to system)")  # must log all the action(login, logout, upload, delete, share)
+    print("download <from_file_path> <to_file_path> (download file from system to local)")
+    print("delete <file_path> (delete the file in the system)")
+    print("share <file_path> <shared_user> (share the specific file with specific user)")
+    print("edit <file_path> (editing files in the system)")
+    print("exit (exit the program)")
+    if admin:
+        print("log <username> (print all the log of a specific user)")
 
 def init():
-    private_key_pem, public_key_pem = generate_keys()
-    private_key = load_private_key(private_key_pem)
-    public_key = load_public_key(public_key_pem)
-    shared_key = get_shared_key(private_key, public_key)
+    with open("keypair.json",'r') as f:
+        keypair = json.load(f)
+        if keypair is None:
+            private_key_pem, public_key_pem = generate_keys()
+            private_key = load_private_key(private_key_pem)
+            public_key = load_public_key(public_key_pem)
+            shared_key = get_shared_key(private_key, public_key)
+            keypair = {
+                'private_key': private_key,
+                'public_key': public_key,
+                'shared_key': shared_key
+            }
+            with open('keypair.json', 'w') as f:
+                json.dump(keypair, f, indent=4)
+        else:
+            private_key = keypair['private_key']
+            public_key = keypair['public_key']
+            shared_key = keypair['shared_key']
     config.GLOBAL_CONFIG['private_key'] = private_key
     config.GLOBAL_CONFIG['public_key'] = public_key
     config.GLOBAL_CONFIG['shared_key'] = shared_key
 
-def listen_client(listener_socket):
-    client_listener, addr = listener_socket.accept()
-    while True:
-        data = client_listener.recv(4096)
-        if not data:
-            break
-        action = json.loads(data)['action']
-        if action == 'confirm_share':
-            if not loginStatus:
-                print("Did not login yet. Please login.")
-            else:
-                confirm_pwd = input("Input your password: ")
-                if confirm_pwd == password:
-                    confirm_share()
-
-def save_keys():
-    with open("./.env", "w") as f:
-        f.write()
 
 def cmd():
     parser = argparse.ArgumentParser(description="Command-line interface")
@@ -52,6 +53,12 @@ def cmd():
     reset_parser.add_argument("password")
     reset_parser.add_argument("confirm_password")
     reset_parser.set_defaults(func=reset)
+
+    reset_password_parser = subparsers.add_parser("reset_password")
+    reset_password_parser.add_argument("username")
+    reset_password_parser.add_argument("password")
+    reset_password_parser.add_argument("new_password")
+    reset_password_parser.set_defaults(func=reset_password)
 
     register_parser = subparsers.add_parser("register")
     register_parser.add_argument("username")
@@ -93,7 +100,7 @@ def cmd():
 
     help_parser = subparsers.add_parser("help")
     help_parser.set_defaults(func=help)
-    threading.Thread(target=listen_client, args=(listener,)).start()
+    #threading.Thread(target=listen_client, args=(listener,)).start()
     while True:
         try:
             if not config.GLOBAL_CONFIG['loginStatus']:
