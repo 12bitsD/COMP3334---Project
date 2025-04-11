@@ -2,6 +2,8 @@ import hashlib
 import json
 import sys
 import requests
+from crypto.SelfTest.Protocol.test_ecdh import private_key
+
 import config
 from CryptographyController import *
 
@@ -9,21 +11,28 @@ headers = {"Content-Type": "application/json"}
 base_url = config.GLOBAL_CONFIG['base_url']
 
 def init(password):
+    dk_salt = os.urandom(16)
+    dk = derive_key(password,dk_salt)
     with open("keypair.json",'r') as f:
         keypair = json.load(f)
         if keypair['metadata'] is None:
+            salt = os.urandom(16)
             private_key_pem, public_key_pem = generate_keys()
             private_key = load_private_key(private_key_pem)
+            ciphertext,nonce,enc_salt = encrypt(dk, private_key_pem.decode('utf-8'))
             public_key = load_public_key(public_key_pem)
             keypair = {
                 'metadata': "Secure",
-                'private_key': private_key_pem.decode('utf-8'),
+                'private_key': ciphertext.decode('utf-8'),
                 'public_key': public_key_pem.decode('utf-8'),
+                "dk_salt": dk_salt.decode('utf-8'),
+                'enc_salt': enc_salt.decode('utf-8'),
+                "nonce": nonce.decode('utf-8'),
             }
             with open('keypair.json', 'w', encoding = 'utf-8') as file:
                 json.dump(keypair,file, indent=4)
         else:
-            private_key = load_private_key(keypair['private_key'].encode('utf-8'))
+            private_key = load_private_key(decrypt(keypair['private_key'],dk_salt,keypair['nonce'].encode('utf-8')).encode('utf-8'))
             public_key = load_public_key(keypair['public_key'].encode('utf-8'))
     config.GLOBAL_CONFIG['private_key'] = private_key
     config.GLOBAL_CONFIG['public_key'] = public_key

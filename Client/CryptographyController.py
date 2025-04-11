@@ -1,8 +1,39 @@
+import os
+
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
 import config
+
+def derive_key(password: str, salt: bytes, iterations: int = 100000) -> bytes:
+    """将用户密码转换为 32 字节的 AES-256 密钥"""
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,  # AES-256 需要 32 字节密钥
+        salt=salt,
+        iterations=iterations,
+    )
+    return kdf.derive(password.encode("utf-8"))
+
+# 2. 加密数据（AES-GCM）
+def encrypt(key: bytes, plaintext: str) -> tuple[bytes, bytes, bytes]:
+    """加密字符串，返回 (密文, nonce, salt)"""
+    salt = os.urandom(16)  # 随机盐（存储它以便解密）
+    nonce = os.urandom(12)  # AES-GCM 需要 12 字节的 nonce
+    aesgcm = AESGCM(key)
+    ciphertext = aesgcm.encrypt(nonce, plaintext.encode("utf-8"), None)
+    return ciphertext, nonce, salt
+
+# 3. 解密数据（AES-GCM）
+def decrypt(key: bytes, ciphertext: bytes, nonce: bytes) -> str:
+    """解密字节数据为字符串"""
+    aesgcm = AESGCM(key)
+    plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+    return plaintext.decode("utf-8")
 
 def generate_keys():
     """生成 RSA 公私钥对并返回 PEM 格式的 bytes"""
