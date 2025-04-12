@@ -50,7 +50,7 @@ def upload(filename):
             "hmac": hmac_result,
             "sign": signature
             }
-    response_raw = requests.post(base_url + suffix, data=json.dumps(data), headers=headers)
+    response_raw = requests.post(base_url + suffix, json=data, headers=headers)
     response = response_raw.json()
     if response["status"] == "success":
         print(f"File uploaded successfully. File ID: {response.get('file_id', 'unknown')}")
@@ -85,7 +85,7 @@ def download(filename):
         "sign":signature,
         "hmac": hmac_result
     }
-    response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
+    response_raw = requests.post(base_url + suffix, json=data_send, headers=headers)
     response = response_raw.json()
     print(response['message'])
     #提取里面的 content
@@ -121,7 +121,7 @@ def delete(filename):
         "sign":signature,
         "hmac": hmac_result
     }
-    response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
+    response_raw = requests.post(base_url + suffix, json=data_send, headers=headers)
     response = response_raw.json()
     if response["status"] == "success":
         print("File deleted successfully.")
@@ -160,7 +160,7 @@ def edit(filename,updated_content):
         "sign":signature,
         "hmac": hmac_result
     }
-    response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
+    response_raw = requests.post(base_url + suffix, json=data_send, headers=headers)
     response = response_raw.json()
     if response["status"] == "success":
         print("File updated successfully.")
@@ -198,7 +198,7 @@ def share(filename, to_user):
         "to_user": to_user_hashed,
         "hmac": hmac_result
     }
-    response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
+    response_raw = requests.post(base_url + suffix, json=data_send, headers=headers)
     response = response_raw.json()
     content=response['content']
     ano_public_key_pem=response['public_key']
@@ -237,7 +237,7 @@ def confirm_share(filename,to_user,cipher_content,ano_public_key):
         "hmac": hmac_result2,
         "sign":signature
     }
-    response_raw = requests.post(base_url + suffix, data=json.dumps(data_send_2), headers=headers)
+    response_raw = requests.post(base_url + suffix, json=data_send_2, headers=headers)
     response = response_raw.json()
     if response["status"] == "success":
         print("File updated successfully.")

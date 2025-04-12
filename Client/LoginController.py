@@ -2,6 +2,8 @@ import hashlib
 import json
 import sys
 import requests
+from crypto.SelfTest.Protocol.test_ecdh import private_key, public_key
+
 import config
 from CryptographyController import *
 import base64
@@ -10,15 +12,12 @@ headers = {"Content-Type": "application/json"}
 base_url = config.GLOBAL_CONFIG['base_url']
 
 def init(password):
-    #print('success')
     with open("keypair.json",'r') as f:
         keypair = json.load(f)
-        #print('success')
         if keypair['metadata'] is None:
             dk_salt = os.urandom(16)
             dk = derive_key(password, dk_salt)
-            print(dk)
-            #print('success')
+
             private_key_pem, public_key_pem = generate_keys()
             private_key = load_private_key(private_key_pem)
             ciphertext,nonce,enc_salt = encrypt(dk, base64.b64encode(private_key_pem).decode('utf-8'))
@@ -31,26 +30,25 @@ def init(password):
                 'enc_salt': base64.b64encode(enc_salt).decode('utf-8'),
                 "nonce": base64.b64encode(nonce).decode('utf-8'),
             }
-            print(keypair)
             with open('keypair.json', 'w', encoding = 'utf-8') as file:
                 json.dump(keypair,file, indent=4)
         else:
             dk_salt = base64.b64decode(keypair['dk_salt'])
             dk = derive_key(password, dk_salt)
-            print(dk)
-            print(keypair)
-            private_key = load_private_key(
-                base64.b64decode(
-                    decrypt(
-                        dk,
-                        base64.b64decode(keypair['private_key']),
-                        base64.b64decode(keypair['nonce'])
-                    ),
-                )
+            private_key_pem = base64.b64decode(
+                decrypt(
+                    dk,
+                    base64.b64decode(keypair['private_key']),
+                    base64.b64decode(keypair['nonce'])
+                ),
             )
-            public_key = load_public_key(base64.b64decode(keypair['public_key']))
+            public_key_pem = base64.b64decode(keypair['public_key'])
+            private_key = load_private_key(private_key_pem)
+            public_key = load_public_key(public_key_pem)
     config.GLOBAL_CONFIG['private_key'] = private_key
     config.GLOBAL_CONFIG['public_key'] = public_key
+    config.GLOBAL_CONFIG['public_key_pem'] = public_key_pem
+    config.GLOBAL_CONFIG['private_key_pem'] = private_key_pem
 
 
 def reset_password(args):
@@ -111,7 +109,7 @@ def register(args):
         print(type(config.GLOBAL_CONFIG['public_key']))
         data = {"user_id": user_id,
                 "password_hash": pwd,
-                "public_key": config.GLOBAL_CONFIG['public_key'],
+                "public_key": config.GLOBAL_CONFIG['public_key_pem'],
                 "email": args.email,
                 "signature":signature}
         status,response = changeStatus(data,args.username,args.password,suffix)
