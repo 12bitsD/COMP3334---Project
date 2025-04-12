@@ -2,7 +2,6 @@ import hashlib
 import json
 import sys
 import requests
-from crypto.SelfTest.Protocol.test_ecdh import private_key, public_key
 
 import config
 from CryptographyController import *
@@ -109,7 +108,7 @@ def register(args):
         print(type(config.GLOBAL_CONFIG['public_key']))
         data = {"user_id": user_id,
                 "password_hash": pwd,
-                "public_key": config.GLOBAL_CONFIG['public_key_pem'],
+                "public_key": base64.b64encode(config.GLOBAL_CONFIG['public_key_pem']).decode('utf-8'),
                 "email": args.email,
                 "signature":signature}
         status,response = changeStatus(data,args.username,args.password,suffix)
