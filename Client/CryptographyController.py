@@ -1,39 +1,40 @@
 import os
 
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.ciphers import modes, algorithms, Cipher
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
 import config
 
-def derive_key(password: str, salt: bytes, iterations: int = 100000) -> bytes:
-    """将用户密码转换为 32 字节的 AES-256 密钥"""
+
+def derive_key(password, salt):
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
-        length=32,  # AES-256 需要 32 字节密钥
+        length=32,
         salt=salt,
-        iterations=iterations,
+        iterations=100000,
+        backend=default_backend()
     )
-    return kdf.derive(password.encode("utf-8"))
+    return kdf.derive(password.encode())
 
-# 2. 加密数据（AES-GCM）
-def encrypt(key: bytes, plaintext: str) -> tuple[bytes, bytes, bytes]:
-    """加密字符串，返回 (密文, nonce, salt)"""
-    salt = os.urandom(16)  # 随机盐（存储它以便解密）
-    nonce = os.urandom(12)  # AES-GCM 需要 12 字节的 nonce
-    aesgcm = AESGCM(key)
-    ciphertext = aesgcm.encrypt(nonce, plaintext.encode("utf-8"), None)
-    return ciphertext, nonce, salt
+def enc(data):
+    iv = os.urandom(16)
+    key = config.GLOBAL_CONFIG['key']
+    padder = padding.PKCS7(128).padder()
+    padded_data = padder.update(data) + padder.finalize()
 
-# 3. 解密数据（AES-GCM）
-def decrypt(key: bytes, ciphertext: bytes, nonce: bytes) -> str:
-    """解密字节数据为字符串"""
-    aesgcm = AESGCM(key)
-    plaintext = aesgcm.decrypt(nonce, ciphertext, None)
-    return plaintext.decode("utf-8")
+    # 创建加密器
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    encryptor = cipher.encryptor()
+
+    # 加密数据
+    encrypted_data = encryptor.update(padded_data) + encryptor.finalize()
+
+    return (encrypted_data, salt, iv)
+
 
 def generate_keys():
     """生成 RSA 公私钥对并返回 PEM 格式的 bytes"""
@@ -85,14 +86,10 @@ def decrypt_with_private_key(ciphertext: bytes, private_key) -> str:
     )
     return plaintext.decode('utf-8')
 
-def sign(message):
-    private_key = config.GLOBAL_CONFIG['private_key']
-    signature = private_key.sign(
-        message,
-        padding.PSS(
-            mgf=padding.MGF1(hashes.SHA256()),
-            salt_length=padding.PSS.MAX_LENGTH
-        ),
-        hashes.SHA256()
-    )
-    return signature
+
+def get_shared_key(data_receive, private_key):
+    encrypted_content = bytes.fromhex(data_receive["cipher_shared_key"])
+    decrypted_shared_key = decrypt_with_private_key(encrypted_content, private_key)
+    shared_key = decrypted_shared_key
+    return shared_key
+
