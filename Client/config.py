@@ -3,7 +3,7 @@ GLOBAL_CONFIG = {
     'password':"",
     'loginStatus':False,
     'admin':False,
-    'base_url' : "http://113.219.237.77:21138",
+    'base_url' : "https://www.u73641.nyat.app:21138",
 }
 
 

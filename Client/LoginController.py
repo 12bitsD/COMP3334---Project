@@ -21,7 +21,7 @@ def init(user_id,password,reset):
                 if item['user_id'] == user_id:
                     found = True
                     if reset:
-                        data.pop(ctr)
+                        keypair.pop(ctr)
                         dk_salt = os.urandom(16)
                         dk = derive_key(password, dk_salt)
                         keypair[0]['metadata'] = "Secure"
@@ -79,16 +79,19 @@ def init(user_id,password,reset):
 
 
 def reset_password(args):
-    suffix = "/change_password"
+    if not config.GLOBAL_CONFIG['loginStatus']:
+        print("Please login first!")
+        return
+    suffix = "/auth/change_password"
     user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
     pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
     new_password = hashlib.sha256(f"{args.new_password}".encode("utf-8")).hexdigest()
-    signature_raw = sign(user_id.encode("utf-8") + pwd.encode("utf-8") + new_password.encode("utf-8"))
-    signature = base64.b64encode(signature_raw).decode('utf-8')
-    init(user_id, new_password,True)
-    data = {'user_id': user_id,'current_password_hash':pwd,'new_password_hash':new_password,'signature':signature}
+    data = {'user_id': user_id,'current_password_hash':pwd,'new_password_hash':new_password}
     response_raw = requests.post(base_url + suffix, json=data, headers=headers)
     response = response_raw.json()
+    if response['status'] == 'success':
+        init(user_id, new_password, True)
+        print("successfully reset password")
     print(response['message']+"Please login again.")
     config.GLOBAL_CONFIG['loginStatus'] = False
     config.GLOBAL_CONFIG['username'] = ""
@@ -105,12 +108,12 @@ def reset(args):   #extra revised needed
         otp = input("Input the otp sent to your email.")
         new_password = hashlib.sha256(f"{args.new_password}".encode("utf-8")).hexdigest()
         suffix = "/reset" #authenticate otp
-        init(user_id, new_password,True)
-        signature = sign(user_id + new_password).decode("utf-8")
-        data = {'user_id': user_id,'password': otp,'new_password_hash':new_password,'signature':signature}
+        #signature = sign(user_id + new_password).decode("utf-8")
+        data = {'user_id': user_id,'password': otp,'new_password_hash':new_password}
         response_raw = requests.post(base_url + suffix, headers=headers, json=data)
         response = response_raw.json()
         if response["status"] == "success":
+            init(user_id, new_password, True)
             print(response["file"])
     else:
         print("Unknown error.")
@@ -122,7 +125,7 @@ def changeStatus(data,username,password,suffix):
         config.GLOBAL_CONFIG['username'] = username
         config.GLOBAL_CONFIG['password'] = password
         config.GLOBAL_CONFIG['loginStatus'] = True
-    print(response["message"])
+    print(response["file"])
     return response['status'] == 'success' , response
 
 
@@ -138,7 +141,7 @@ def register(args):
         init(user_id, args.password,False)
         signature_raw = sign(user_id.encode("utf-8") + pwd.encode("utf-8"))
         signature = base64.b64encode(signature_raw).decode('utf-8')
-        print(type(config.GLOBAL_CONFIG['public_key']))
+        #print(type(config.GLOBAL_CONFIG['public_key']))
         data = {"user_id": user_id,
                 "password_hash": pwd,
                 "public_key": base64.b64encode(config.GLOBAL_CONFIG['public_key_pem']).decode('utf-8'),
@@ -151,7 +154,7 @@ def exit():
     sys.exit()
 
 def login(args):
-    suffix = "/login"
+    suffix = "/auth/login"
     print(f"{args.username} logging...")
     pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
     user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
@@ -170,7 +173,7 @@ def log(args):
         return
     print(f"Fetching logs for user: {args.username}")
     user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
-    suffix = "/logs?user_id="+user_id
+    suffix = "/auth/logs?user_id="+user_id
     response_raw = requests.get(base_url + suffix, headers=headers)
     response = response_raw.json()
     if response["status"] == "success":
