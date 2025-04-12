@@ -50,25 +50,25 @@ def cmd():
 
     upload_parser = subparsers.add_parser("upload")
     upload_parser.add_argument("filename")
-    upload_parser.set_defaults(func=upload)
+    upload_parser.set_defaults(func=upload_starter)
 
     download_parser = subparsers.add_parser("download")
     download_parser.add_argument("filename")
-    download_parser.set_defaults(func=download)
+    download_parser.set_defaults(func=download_strater)
 
     delete_parser = subparsers.add_parser("delete")
     delete_parser.add_argument("filename")
-    delete_parser.set_defaults(func=delete)
+    delete_parser.set_defaults(func=delete_starter)
 
     share_parser = subparsers.add_parser("share")
     share_parser.add_argument("filename")
     share_parser.add_argument("to_user")
-    share_parser.set_defaults(func=ask_share)
+    share_parser.set_defaults(func=share_starter)
 
     edit_parser = subparsers.add_parser("edit")
     edit_parser.add_argument("filename")
     edit_parser.add_argument("updated_content")
-    edit_parser.set_defaults(func=edit)
+    edit_parser.set_defaults(func=edit_starter)
 
     log_parser = subparsers.add_parser("log")
     log_parser.add_argument("username")
@@ -76,7 +76,7 @@ def cmd():
 
     help_parser = subparsers.add_parser("help")
     help_parser.set_defaults(func=help)
-    #threading.Thread(target=listen_client, args=(listener,)).start()
+
     while True:
         try:
             if not config.GLOBAL_CONFIG['loginStatus']:
