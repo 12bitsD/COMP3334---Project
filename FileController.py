@@ -47,6 +47,7 @@ def upload(filename):
             "username": username_hashed,
             "content": ciphertext,
             "hmac": hmac_result,
+            "password":pwd,
             "sign": signature
             }
     response_raw = requests.post(base_url + suffix, data=json.dumps(data), headers=headers)
@@ -81,6 +82,7 @@ def download(filename):
         "filename": cipher_filename,
         "username": username_hashed,
         "sign":signature,
+        "password":pwd,
         "hmac": hmac_result
     }
     response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
@@ -116,6 +118,7 @@ def delete(filename):
         "filename": cipher_filename,
         "username": username_hashed,
         "sign":signature,
+        "password":pwd,
         "hmac": hmac_result
     }
     response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
@@ -154,6 +157,7 @@ def edit(filename,updated_content):
         "username": username_hashed,
         "content": ciphertext,
         "sign":signature,
+        "password":pwd,
         "hmac": hmac_result
     }
     response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
@@ -190,6 +194,7 @@ def share(filename, to_user):
         "username": username_hashed,
         "sign":signature,
         "to_user": to_user_hashed,
+        "password": pwd,
         "hmac": hmac_result
     }
     response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
@@ -225,6 +230,7 @@ def confirm_share(filename,to_user,cipher_content,ano_public_key):
         "filename":cipher_filename,
         "username": username_hashed,
         "to_user": to_user_hashed,
+        "password":pwd,
         "hmac": hmac_result2,
         "sign":signature2
     }
