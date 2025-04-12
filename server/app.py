@@ -2,8 +2,6 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 
@@ -33,21 +31,21 @@ default_limits=["200 per day", "50 per hour"]
 def ratelimit_handler(e):
     return jsonify({
         'status': 'error',
-        'message': '请求过于频繁，请稍后再试'
+        'file': 'Too many requests, please try again later'
     }), 429
 
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({
         'status': 'error',
-        'message': '请求的资源不存在'
+        'file': 'The requested resource does not exist'
     }), 404
 
 @app.errorhandler(500)
 def internal_error(e):
     return jsonify({
         'status': 'error',
-        'message': '服务器内部错误'
+        'file': 'Internal server error'
     }), 500
 
 if __name__ == '__main__':
