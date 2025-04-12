@@ -38,8 +38,8 @@ def upload(filename):
     h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
     hmac_result = h.hexdigest()
 
-
-    signature=sign(all_message.encode()).decode()
+    signature_raw = sign(message_bytes)
+    signature = base64.b64encode(signature_raw).decode('utf-8')
 
     #print("cipher_username 类型是：", type(cipher_username))
     data = {"action": "upload",
@@ -49,7 +49,7 @@ def upload(filename):
             "hmac": hmac_result,
             "sign": signature
             }
-    response_raw = requests.post(base_url + suffix, data=data, headers=headers)
+    response_raw = requests.post(base_url + suffix, data=json.dumps(data), headers=headers)
     response = response_raw.json()
     if response["status"] == "success":
         print(f"File uploaded successfully. File ID: {response.get('file_id', 'unknown')}")
@@ -74,7 +74,8 @@ def download(filename):
     h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
     hmac_result = h.hexdigest()
 
-    signature=sign(all_message.encode()).decode()
+    signature_raw = sign(message_bytes)
+    signature = base64.b64encode(signature_raw).decode('utf-8')
 
     data_send = {
         "action": "download",
@@ -83,7 +84,7 @@ def download(filename):
         "sign":signature,
         "hmac": hmac_result
     }
-    response_raw = requests.post(base_url + suffix, data=data_send, headers=headers)
+    response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
     response = response_raw.json()
     print(response['message'])
     #提取里面的 content
@@ -109,7 +110,8 @@ def delete(filename):
     h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
     hmac_result = h.hexdigest()
 
-    signature=sign(all_message.encode()).decode()
+    signature_raw = sign(message_bytes)
+    signature = base64.b64encode(signature_raw).decode('utf-8')
 
     data_send = {
         "action": "delete",
@@ -118,7 +120,7 @@ def delete(filename):
         "sign":signature,
         "hmac": hmac_result
     }
-    response_raw = requests.post(base_url + suffix, data=data_send, headers=headers)
+    response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
     response = response_raw.json()
     if response["status"] == "success":
         print("File deleted successfully.")
@@ -146,7 +148,8 @@ def edit(filename,updated_content):
     shared_key_bytes = shared_key.encode('utf-8')
     h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
     hmac_result = h.hexdigest()
-    signature=sign(all_message.encode()).decode()
+    signature_raw = sign(message_bytes)
+    signature = base64.b64encode(signature_raw).decode('utf-8')
 
     data_send = {
         "action": "update",
@@ -156,7 +159,7 @@ def edit(filename,updated_content):
         "sign":signature,
         "hmac": hmac_result
     }
-    response_raw = requests.post(base_url + suffix, data=data_send, headers=headers)
+    response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
     response = response_raw.json()
     if response["status"] == "success":
         print("File updated successfully.")
@@ -183,7 +186,8 @@ def share(filename, to_user):
     h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
     hmac_result = h.hexdigest()
 
-    signature=sign(all_message.encode()).decode()
+    signature_raw = sign(message_bytes)
+    signature = base64.b64encode(signature_raw).decode('utf-8')
 
     data_send = {
         "action": "ask_share",
@@ -193,7 +197,7 @@ def share(filename, to_user):
         "to_user": to_user_hashed,
         "hmac": hmac_result
     }
-    response_raw = requests.post(base_url + suffix, data=data_send, headers=headers)
+    response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
     response = response_raw.json()
     content=response['content']
     ano_public_key=response['public_key']
@@ -215,7 +219,9 @@ def confirm_share(filename,to_user,cipher_content,ano_public_key):
     shared_key_bytes2 = config.GLOBAL_CONFIG['shared_key'].encode('utf-8')
     h2 = hmac.new(shared_key_bytes2, message_bytes2, hashlib.sha256)
     hmac_result2 = h2.hexdigest()
-    signature2 = sign(all_message2.encode()).decode()
+
+    signature_raw = sign(message_bytes2)
+    signature = base64.b64encode(signature_raw).decode('utf-8')
 
     content=decrypt_with_private_key(cipher_content,private_key)
     ano_cipher_content=encrypt_with_public_key(content,ano_public_key)
@@ -227,9 +233,9 @@ def confirm_share(filename,to_user,cipher_content,ano_public_key):
         "username": username_hashed,
         "to_user": to_user_hashed,
         "hmac": hmac_result2,
-        "sign":signature2
+        "sign":signature
     }
-    response_raw = requests.post(base_url + suffix, data=data_send_2, headers=headers)
+    response_raw = requests.post(base_url + suffix, data=json.dumps(data_send_2), headers=headers)
     response = response_raw.json()
     if response["status"] == "success":
         print("File updated successfully.")
