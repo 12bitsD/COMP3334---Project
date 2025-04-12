@@ -15,6 +15,10 @@ def header_enc(filename):
     pwd = hashlib.sha256(f"{config.GLOBAL_CONFIG['password']}".encode("utf-8")).hexdigest()
     return cipher_username, cipher_filename, pwd
 
+def upload_starter(arg):
+    filename=arg.filename
+    upload(filename)
+
 def upload(filename):
     suffix = "/auth/message/send"
     public_key=config.GLOBAL_CONFIG['public_key']
@@ -52,6 +56,9 @@ def upload(filename):
     else:
         print(f"Upload failed: {response.get('file', 'Unknown error')}")
 
+def download_strater(arg):
+    filename=arg.filename
+    download(filename)
 def download(filename):
     suffix = "/auth/message/send"
     shared_key=config.GLOBAL_CONFIG['shared_key']
@@ -84,6 +91,9 @@ def download(filename):
     decrypted_text = decrypt_with_private_key(encrypted_content, config.GLOBAL_CONFIG['private_key'])
     print(decrypted_text)
 
+def delete_starter(arg):
+    filename=arg.filename
+    delete(filename)
 
 def delete(filename):
     suffix = "/auth/message/send"
@@ -115,6 +125,10 @@ def delete(filename):
     else:
         print(f"Delete failed: {response.get('file', 'Unknown error')}")
 
+def edit_starter(arg):
+    filename=arg.filename
+    updated_content=arg.updated_content
+    edit(filename,updated_content)
 
 def edit(filename,updated_content):
     suffix = "/auth/message/send"
@@ -149,6 +163,10 @@ def edit(filename,updated_content):
     else:
         print(f"Update failed: {response.get('file', 'Unknown error')}")
 
+def share(arg):
+    filename=arg.filename
+    to_user=arg.to_user
+    share(filename,to_user)
 
 def share(filename, to_user):
     suffix = "/auth/message/send"
