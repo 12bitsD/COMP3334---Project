@@ -1,9 +1,8 @@
 import hashlib
 import json
 import sys
-import socket
-import config
 import requests
+import config
 
 username = config.GLOBAL_CONFIG['username']
 password = config.GLOBAL_CONFIG['password']
@@ -11,13 +10,57 @@ loginStatus = config.GLOBAL_CONFIG['loginStatus']
 
 base_url = "http://localhost:5000"
 
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect(("127.0.0.1",8080))
-
 def sendAndRev(data):
-    client.sendall(json.dumps(data).encode())
-    response = json.loads(client.recv(4096).decode())
-    return response
+    action = data.get("action", "")
+    
+    if action == "register":
+        response = requests.post(f"{base_url}/auth/register", json={
+            "user_id": data["username"], 
+            "password_hash": data["password"],
+            "public_key": config.GLOBAL_CONFIG.get('public_key', ""),
+            "email": data.get("email", "")
+        })
+    elif action == "reset":
+        if "password" in data:
+            response = requests.post(f"{base_url}/auth/reset_password", json={
+                "user_id": data["username"],
+                "new_password_hash": data["password"]
+            })
+        else:
+            response = requests.post(f"{base_url}/auth/request_reset", json={
+                "user_id": data["username"]
+            })
+    elif action == "AuthenticateOTP":
+        response = requests.post(f"{base_url}/auth/verify_otp", json={
+            "otp": data["otp"]
+        })
+    elif action in ["upload", "ask_share", "confirm_share"]:
+        response = requests.post(f"{base_url}/files/{action}", json=data)
+    elif action == "download":
+        username = data["username"]
+        auth = data["auth"]
+        filename = data["filename"]
+        response = requests.get(f"{base_url}/files/download", params={
+            "username": username,
+            "auth": auth,
+            "filename": filename,
+            "hmac": data.get("hmac", "")
+        })
+    elif action == "delete":
+        username = data["username"]
+        auth = data["auth"]
+        filename = data["filename"]
+        response = requests.delete(f"{base_url}/files/delete", params={
+            "username": username,
+            "auth": auth,
+            "filename": filename,
+            "hmac": data.get("hmac", "")
+        })
+    else:
+        # Default fallback
+        response = requests.post(f"{base_url}/api", json=data)
+    
+    return response.json()
 
 
 def help(admin=False):
@@ -37,13 +80,11 @@ def help(admin=False):
 
 def reset(args):
     data = {"action": "reset", "username": args.username}
-    client.sendall(json.dumps(data).encode())
-    response = json.loads(client.recv(1024).decode())
+    response = sendAndRev(data)
     if response["status"] == "pending":
         otp = input("input the otp sent to your email.")
         data = {"action": "AuthenticateOTP", "otp": otp}
-        client.sendall(json.dumps(data).encode())
-        response = json.loads(client.recv(1024).decode())
+        response = sendAndRev(data)
         if response["status"] == "success":
             ctr = 0
             newpwd = input("input the new password.")
@@ -56,8 +97,7 @@ def reset(args):
             if (ctr < 4):
                 pwd = hashlib.sha256(newpwd.encode()).hexdigest()
                 data = {"action": "reset", "username": args.username, "password": pwd}
-                client.sendall(json.dumps(data).encode())
-                response = json.loads(client.recv(1024).decode())
+                response = sendAndRev(data)
                 if response["status"] == "success":
                     print("Password has been reset.")
             else:
@@ -76,12 +116,11 @@ def register(args):
         pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
         usrnm = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
         data = {"action": "register", "username": usrnm, "password": pwd, "email": args.email}
-        client.sendall(json.dumps(data).encode())
-        response = json.loads(client.recv(1024).decode())
+        response = sendAndRev(data)
         if response["status"] == "success":
             print("user registered")
         else:
-            print(f"{response['message']}")
+            print(f"{response['file']}")
 
 def exit():
     sys.exit()
@@ -90,9 +129,11 @@ def login(args):
     print("logging...")
     pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
     usrnm = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
-    data = {"action": "login", "username": usrnm, "password": pwd}
-    client.sendall(json.dumps(data).encode())
-    response = json.loads(client.recv(1024).decode())
+    data = {
+        "user_id": usrnm,
+        "password_hash": pwd
+    }
+    response = requests.post(f"{base_url}/auth/login", json=data).json()
     if response["status"] == "success":
         print("user logged in")
         global username
@@ -107,3 +148,11 @@ def login(args):
 
 def log(args):
     print(f"Fetching logs for user: {args.username}")
+    username_hash = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
+    response = requests.get(f"{base_url}/utilities/logs", params={"user_id": username_hash}).json()
+    if response["status"] == "success":
+        logs = response.get("logs", [])
+        for log in logs:
+            print(log)
+    else:
+        print(f"Error fetching logs: {response.get('file', 'Unknown error')}")

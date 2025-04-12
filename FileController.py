@@ -1,3 +1,4 @@
+
 from LoginController import *
 import hmac
 from CryptographyController import *
@@ -15,8 +16,8 @@ def header_enc(filename):
     pwd = hashlib.sha256(f"{config.GLOBAL_CONFIG['password']}".encode("utf-8")).hexdigest()
     return cipher_username, cipher_filename, pwd
 
-def upload_starter(arg):
-    filename=arg.filename
+def upload_starter(args):
+    filename=args.filename
     upload(filename)
 
 def upload(filename):
@@ -39,7 +40,7 @@ def upload(filename):
     hmac_result = h.hexdigest()
 
 
-    signature=sign(b"upload")
+    signature=sign(all_message.encode()).decode()
 
     #print("cipher_username 类型是：", type(cipher_username))
     data = {"action": "upload",
@@ -56,8 +57,8 @@ def upload(filename):
     else:
         print(f"Upload failed: {response.get('file', 'Unknown error')}")
 
-def download_strater(arg):
-    filename=arg.filename
+def download_strater(args):
+    filename=args.filename
     download(filename)
 def download(filename):
     suffix = "/auth/message/send"
@@ -74,7 +75,7 @@ def download(filename):
     h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
     hmac_result = h.hexdigest()
 
-    signature=sign(b"download")
+    signature=sign(all_message.encode()).decode()
 
     data_send = {
         "action": "download",
@@ -91,8 +92,8 @@ def download(filename):
     decrypted_text = decrypt_with_private_key(encrypted_content, config.GLOBAL_CONFIG['private_key'])
     print(decrypted_text)
 
-def delete_starter(arg):
-    filename=arg.filename
+def delete_starter(args):
+    filename=args.filename
     delete(filename)
 
 def delete(filename):
@@ -109,7 +110,7 @@ def delete(filename):
     h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
     hmac_result = h.hexdigest()
 
-    signature = sign(b"delete")
+    signature=sign(all_message.encode()).decode()
 
     data_send = {
         "action": "delete",
@@ -125,9 +126,9 @@ def delete(filename):
     else:
         print(f"Delete failed: {response.get('file', 'Unknown error')}")
 
-def edit_starter(arg):
-    filename=arg.filename
-    updated_content=arg.updated_content
+def edit_starter(args):
+    filename=args.filename
+    updated_content=args.updated_content
     edit(filename,updated_content)
 
 def edit(filename,updated_content):
@@ -146,7 +147,7 @@ def edit(filename,updated_content):
     shared_key_bytes = shared_key.encode('utf-8')
     h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
     hmac_result = h.hexdigest()
-    signature = sign(b"download")
+    signature=sign(all_message.encode()).decode()
 
     data_send = {
         "action": "update",
@@ -163,9 +164,9 @@ def edit(filename,updated_content):
     else:
         print(f"Update failed: {response.get('file', 'Unknown error')}")
 
-def share(arg):
-    filename=arg.filename
-    to_user=arg.to_user
+def share_starter(args):
+    filename=args.filename
+    to_user=args.to_user
     share(filename,to_user)
 
 def share(filename, to_user):
@@ -183,7 +184,8 @@ def share(filename, to_user):
     h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
     hmac_result = h.hexdigest()
 
-    signature = sign(b"share1")
+    signature=sign(all_message.encode()).decode()
+
     data_send = {
         "action": "ask_share",
         "filename": cipher_filename,
@@ -214,7 +216,7 @@ def confirm_share(filename,to_user,cipher_content,ano_public_key):
     shared_key_bytes2 = config.GLOBAL_CONFIG['shared_key'].encode('utf-8')
     h2 = hmac.new(shared_key_bytes2, message_bytes2, hashlib.sha256)
     hmac_result2 = h2.hexdigest()
-    signature2 = sign(b"share2")
+    signature2 = sign(all_message.encode()).decode()
 
     content=decrypt_with_private_key(cipher_content,private_key)
     ano_cipher_content=encrypt_with_public_key(content,ano_public_key)
