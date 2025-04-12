@@ -3,7 +3,7 @@ GLOBAL_CONFIG = {
     'password':"",
     'loginStatus':False,
     'admin':False,
-    'base_url' : "183.6.211.182:21138",
+    'base_url' : "http://127.0.0.1:22",
 }
 
 

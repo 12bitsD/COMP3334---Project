@@ -61,7 +61,7 @@ def reset_password(args):
     signature_raw = sign(user_id.encode("utf-8") + pwd.encode("utf-8") + new_password.encode("utf-8"))
     signature = base64.b64encode(signature_raw).decode('utf-8')
     data = {'user_id': user_id,'current_password_hash':pwd,'new_password_hash':new_password,'signature':signature}
-    response_raw = requests.post(base_url + suffix, data=data, headers=headers)
+    response_raw = requests.post(base_url + suffix, json=data, headers=headers)
     response = response_raw.json()
     print(response['message'])
 
@@ -70,7 +70,7 @@ def reset(args):   #extra revised needed
     suffix = "/otp/request"
     user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
     data = {"user_id": user_id}
-    response_raw = requests.post(base_url + suffix, headers=headers, data=data) #request otp
+    response_raw = requests.post(base_url + suffix, headers=headers, json=data) #request otp
     response = response_raw.json()
     if response["status"] == "success":
         otp = input("Input the otp sent to your email.")
@@ -78,7 +78,7 @@ def reset(args):   #extra revised needed
         suffix = "/reset" #authenticate otp
         signature = sign(user_id + new_password).decode("utf-8")
         data = {'user_id': user_id,'password': otp,'new_password_hash':new_password,'signature':signature}
-        response_raw = requests.post(base_url + suffix, headers=headers, data=data)
+        response_raw = requests.post(base_url + suffix, headers=headers, json=data)
         response = response_raw.json()
         if response["status"] == "success":
             print(response["file"])
@@ -86,7 +86,7 @@ def reset(args):   #extra revised needed
         print("Unknown error.")
 
 def changeStatus(data,username,password,suffix):
-    response_raw = requests.post(base_url + suffix, headers=headers, data=data)
+    response_raw = requests.post(base_url + suffix, headers=headers, json=data)
     response = response_raw.json()
     if response["status"] == "success":
         config.GLOBAL_CONFIG['username'] = username
@@ -97,7 +97,7 @@ def changeStatus(data,username,password,suffix):
 
 
 def register(args):
-    suffix = "/auth/register"
+    suffix = "/register"
     status = False
     if args.password != args.confirm_password:
         print("password mismatch, please try again")
@@ -108,6 +108,7 @@ def register(args):
         user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
         signature_raw = sign(user_id.encode("utf-8") + pwd.encode("utf-8"))
         signature = base64.b64encode(signature_raw).decode('utf-8')
+        print(type(config.GLOBAL_CONFIG['public_key']))
         data = {"user_id": user_id,
                 "password_hash": pwd,
                 "public_key": config.GLOBAL_CONFIG['public_key'],

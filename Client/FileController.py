@@ -5,6 +5,7 @@ from LoginController import *
 import hmac
 from CryptographyController import *
 import config
+from cryptography.hazmat.primitives import serialization
 
 headers = {"Content-Type": "application/json"}
 base_url = config.GLOBAL_CONFIG['base_url']
@@ -200,7 +201,8 @@ def share(filename, to_user):
     response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
     response = response_raw.json()
     content=response['content']
-    ano_public_key=response['public_key']
+    ano_public_key_pem=response['public_key']
+    ano_public_key=serialization.load_pem_public_key(ano_public_key_pem)
     cipher_content=encrypt_with_public_key(content, ano_public_key).hex()
     confirm_share(filename,to_user,cipher_content,ano_public_key)
 
