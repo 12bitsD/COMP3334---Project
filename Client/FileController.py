@@ -12,7 +12,7 @@ base_url = config.GLOBAL_CONFIG['base_url']
 def header_enc(filename):
     cipher_username = encrypt_with_public_key(config.GLOBAL_CONFIG['username'], config.GLOBAL_CONFIG['public_key']).hex()
     cipher_filename = encrypt_with_public_key(filename, config.GLOBAL_CONFIG['public_key']).hex()
-    pwd = hashlib.sha256(f"{config.GLOBAL_CONFIG['username'] + config.GLOBAL_CONFIG['password']}".encode("utf-8")).hexdigest()
+    pwd = hashlib.sha256(f"{config.GLOBAL_CONFIG['password']}".encode("utf-8")).hexdigest()
     return cipher_username, cipher_filename, pwd
 
 def upload(filename):
@@ -47,8 +47,10 @@ def upload(filename):
             }
     response_raw = requests.post(base_url + suffix, data=json.dumps(data), headers=headers)
     response = response_raw.json()
-    print(response['message'])
-
+    if response["status"] == "success":
+        print(f"File uploaded successfully. File ID: {response.get('file_id', 'unknown')}")
+    else:
+        print(f"Upload failed: {response.get('file', 'Unknown error')}")
 
 def download(filename):
     suffix = "/auth/message/send"
@@ -108,7 +110,10 @@ def delete(filename):
     }
     response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
     response = response_raw.json()
-    print(response['message'])
+    if response["status"] == "success":
+        print("File deleted successfully.")
+    else:
+        print(f"Delete failed: {response.get('file', 'Unknown error')}")
 
 
 def edit(filename,updated_content):
@@ -139,7 +144,11 @@ def edit(filename,updated_content):
     }
     response_raw = requests.post(base_url + suffix, data=json.dumps(data_send), headers=headers)
     response = response_raw.json()
-    print(response['message'])
+    if response["status"] == "success":
+        print("File updated successfully.")
+    else:
+        print(f"Update failed: {response.get('file', 'Unknown error')}")
+
 
 def share(filename, to_user):
     suffix = "/auth/message/send"
@@ -158,7 +167,7 @@ def share(filename, to_user):
 
     signature = sign(b"share1")
     data_send = {
-        "action": "share_get_content_public_key",
+        "action": "ask_share",
         "filename": cipher_filename,
         "username": username_hashed,
         "sign":signature,
@@ -169,19 +178,32 @@ def share(filename, to_user):
     response = response_raw.json()
     content=response['content']
     ano_public_key=response['public_key']
-    cipher_filename = encrypt_with_public_key(filename, ano_public_key).hex()
     cipher_content=encrypt_with_public_key(content, ano_public_key).hex()
+    confirm_share(filename,to_user,cipher_content,ano_public_key)
+
+def confirm_share(filename,to_user,cipher_content,ano_public_key):
+
+    suffix = "/auth/message/send"
+    username = config.GLOBAL_CONFIG['username']
+    private_key=config.GLOBAL_CONFIG['private_key']
+
+    cipher_username, cipher_filename, pwd = header_enc(filename)
+    to_user_hashed = hashlib.sha256(f"{to_user}".encode("utf-8")).hexdigest()
+    username_hashed = hashlib.sha256(f"{username}".encode("utf-8")).hexdigest()
 
     all_message2 = "share2" + username_hashed + cipher_filename + to_user_hashed
     message_bytes2 = all_message2.encode('utf-8')
     shared_key_bytes2 = config.GLOBAL_CONFIG['shared_key'].encode('utf-8')
     h2 = hmac.new(shared_key_bytes2, message_bytes2, hashlib.sha256)
     hmac_result2 = h2.hexdigest()
-
     signature2 = sign(b"share2")
+
+    content=decrypt_with_private_key(cipher_content,private_key)
+    ano_cipher_content=encrypt_with_public_key(content,ano_public_key)
+
     data_send_2={
         "action":"share content",
-        "content": cipher_content,
+        "content": ano_cipher_content,
         "filename":cipher_filename,
         "username": username_hashed,
         "to_user": to_user_hashed,
@@ -190,4 +212,7 @@ def share(filename, to_user):
     }
     response_raw = requests.post(base_url + suffix, data=json.dumps(data_send_2), headers=headers)
     response = response_raw.json()
-    print(response['message'])
+    if response["status"] == "success":
+        print("File updated successfully.")
+    else:
+        print(f"Update failed: {response.get('file', 'Unknown error')}")

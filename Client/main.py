@@ -4,7 +4,7 @@ import argparse
 import shlex
 import config
 
-def help(admin=False):
+def help():
     print("register <username> <password> <confirm_password> <email_address> (register a user)")
     print("login <username> <password> (login with username and password)")
     print("reset <username> <password> (reset the password of a user)")
@@ -14,7 +14,7 @@ def help(admin=False):
     print("share <file_path> <shared_user> (share the specific file with specific user)")
     print("edit <file_path> (editing files in the system)")
     print("exit (exit the program)")
-    if admin:
+    if config.GLOBAL_CONFIG['admin']:
         print("log <username> (print all the log of a specific user)")
 
 def cmd():
