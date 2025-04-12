@@ -10,40 +10,46 @@ import base64
 headers = {"Content-Type": "application/json"}
 base_url = config.GLOBAL_CONFIG['base_url']
 
-def init(password):
+def init(user_id,password):
     with open("keypair.json",'r') as f:
         keypair = json.load(f)
-        if keypair['metadata'] is None:
+        found = False
+        if keypair[0]['metadata'] == "Secure":
+            for item in keypair[1:]:
+                if item['user_id'] == user_id:
+                    found = True
+                    dk_salt = base64.b64decode(item['dk_salt'])
+                    dk = derive_key(password, dk_salt)
+                    private_key_pem = base64.b64decode(
+                        decrypt(
+                            dk,
+                            base64.b64decode(item['private_key']),
+                            base64.b64decode(item['nonce'])
+                        ),
+                    )
+                    public_key_pem = base64.b64decode(item['public_key'])
+                    private_key = load_private_key(private_key_pem)
+                    public_key = load_public_key(public_key_pem)
+        if (keypair[0]['metadata'] is None) or (found == False) :
             dk_salt = os.urandom(16)
             dk = derive_key(password, dk_salt)
-
+            keypair[0]['metadata'] = "Secure"
             private_key_pem, public_key_pem = generate_keys()
             private_key = load_private_key(private_key_pem)
             ciphertext,nonce,enc_salt = encrypt(dk, base64.b64encode(private_key_pem).decode('utf-8'))
             public_key = load_public_key(public_key_pem)
-            keypair = {
-                'metadata': "Secure",
+            data = {
+                'user_id': user_id,
                 'private_key': base64.b64encode(ciphertext).decode('utf-8'),
                 'public_key': base64.b64encode(public_key_pem).decode('utf-8'),
                 "dk_salt": base64.b64encode(dk_salt).decode('utf-8'),
                 'enc_salt': base64.b64encode(enc_salt).decode('utf-8'),
                 "nonce": base64.b64encode(nonce).decode('utf-8'),
             }
+            keypair.append(data)
             with open('keypair.json', 'w', encoding = 'utf-8') as file:
                 json.dump(keypair,file, indent=4)
-        else:
-            dk_salt = base64.b64decode(keypair['dk_salt'])
-            dk = derive_key(password, dk_salt)
-            private_key_pem = base64.b64decode(
-                decrypt(
-                    dk,
-                    base64.b64decode(keypair['private_key']),
-                    base64.b64decode(keypair['nonce'])
-                ),
-            )
-            public_key_pem = base64.b64decode(keypair['public_key'])
-            private_key = load_private_key(private_key_pem)
-            public_key = load_public_key(public_key_pem)
+
     config.GLOBAL_CONFIG['private_key'] = private_key
     config.GLOBAL_CONFIG['public_key'] = public_key
     config.GLOBAL_CONFIG['public_key_pem'] = public_key_pem
@@ -94,15 +100,15 @@ def changeStatus(data,username,password,suffix):
 
 
 def register(args):
-    suffix = "/register"
+    suffix = "/auth/register"
     status = False
     if args.password != args.confirm_password:
         print("password mismatch, please try again")
     else:
         print(f"Registering user: {args.username}")
-        init(args.password)
         pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
         user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
+        init(user_id, args.password)
         signature_raw = sign(user_id.encode("utf-8") + pwd.encode("utf-8"))
         signature = base64.b64encode(signature_raw).decode('utf-8')
         print(type(config.GLOBAL_CONFIG['public_key']))
@@ -122,6 +128,7 @@ def login(args):
     print(f"{args.username} logging...")
     pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
     user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
+    init(user_id, args.password)
     signature_raw = sign(user_id.encode("utf-8") + pwd.encode("utf-8"))
     signature = base64.b64encode(signature_raw).decode('utf-8')
     data = {"user_id": user_id, "password_hash": pwd,"signature":signature}

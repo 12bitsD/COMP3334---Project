@@ -21,23 +21,20 @@ def upload_starter(args):
     upload(filename)
 
 def upload(filename):
-    suffix = "/auth/message/send"
+    suffix = "/files/upload"
     public_key=config.GLOBAL_CONFIG['public_key']
-    shared_key=config.GLOBAL_CONFIG['shared_key']
+    private_key=config.GLOBAL_CONFIG['private_key']
     username = config.GLOBAL_CONFIG['username']
     username_hashed = hashlib.sha256(f"{username}".encode("utf-8")).hexdigest()
 
     #global shared_key, username, password,public_key,shared_key
-    with open("content.txt", "r", encoding="utf-8") as f:
+    with open(filename, "r", encoding="utf-8") as f:
         plaintext = f.read()
     ciphertext = encrypt_with_public_key(plaintext, public_key).hex()
     cipher_username, cipher_filename, pwd = header_enc(filename)
 
     all_message = "upload" + username_hashed + cipher_filename + ciphertext
     message_bytes = all_message.encode('utf-8')
-    shared_key_bytes = shared_key.encode('utf-8')
-    h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
-    hmac_result = h.hexdigest()
 
     signature_raw = sign(message_bytes)
     signature = base64.b64encode(signature_raw).decode('utf-8')
@@ -47,11 +44,12 @@ def upload(filename):
             "filename": cipher_filename,
             "username": username_hashed,
             "content": ciphertext,
-            "hmac": hmac_result,
             "sign": signature
             }
+    print("filename")
     response_raw = requests.post(base_url + suffix, json=data, headers=headers)
     response = response_raw.json()
+    print(response["status"])
     if response["status"] == "success":
         print(f"File uploaded successfully. File ID: {response.get('file_id', 'unknown')}")
     else:
@@ -61,9 +59,7 @@ def download_strater(args):
     filename=args.filename
     download(filename)
 def download(filename):
-    suffix = "/auth/message/send"
-    shared_key=config.GLOBAL_CONFIG['shared_key']
-    #global username, password, public_key, shared_key
+    suffix = "/files/download"
     username = config.GLOBAL_CONFIG['username']
     username_hashed = hashlib.sha256(f"{username}".encode("utf-8")).hexdigest()
 
@@ -71,9 +67,6 @@ def download(filename):
     cipher_username, cipher_filename, pwd = header_enc(filename)
     all_message = "download" + username_hashed + cipher_filename
     message_bytes = all_message.encode('utf-8')
-    shared_key_bytes = shared_key.encode('utf-8')
-    h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
-    hmac_result = h.hexdigest()
 
     signature_raw = sign(message_bytes)
     signature = base64.b64encode(signature_raw).decode('utf-8')
@@ -82,12 +75,11 @@ def download(filename):
         "action": "download",
         "filename": cipher_filename,
         "username": username_hashed,
-        "sign":signature,
-        "hmac": hmac_result
+        "sign":signature
     }
     response_raw = requests.post(base_url + suffix, json=data_send, headers=headers)
     response = response_raw.json()
-    print(response['message'])
+    print(response.get('file', response.get('message', 'No message')))
     #提取里面的 content
     encrypted_content = bytes.fromhex(response["content"])
     decrypted_text = decrypt_with_private_key(encrypted_content, config.GLOBAL_CONFIG['private_key'])
@@ -98,8 +90,7 @@ def delete_starter(args):
     delete(filename)
 
 def delete(filename):
-    suffix = "/auth/message/send"
-    shared_key=config.GLOBAL_CONFIG['shared_key']
+    suffix = "/files/delete"
     #global username, password, public_key, shared_key
     cipher_username, cipher_filename, pwd = header_enc(filename)
     username = config.GLOBAL_CONFIG['username']
@@ -107,9 +98,6 @@ def delete(filename):
 
     all_message = "delete" + username_hashed + cipher_filename
     message_bytes = all_message.encode('utf-8')
-    shared_key_bytes = shared_key.encode('utf-8')
-    h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
-    hmac_result = h.hexdigest()
 
     signature_raw = sign(message_bytes)
     signature = base64.b64encode(signature_raw).decode('utf-8')
@@ -118,8 +106,7 @@ def delete(filename):
         "action": "delete",
         "filename": cipher_filename,
         "username": username_hashed,
-        "sign":signature,
-        "hmac": hmac_result
+        "sign":signature
     }
     response_raw = requests.post(base_url + suffix, json=data_send, headers=headers)
     response = response_raw.json()
@@ -134,8 +121,7 @@ def edit_starter(args):
     edit(filename,updated_content)
 
 def edit(filename,updated_content):
-    suffix = "/auth/message/send"
-    shared_key = config.GLOBAL_CONFIG['shared_key']
+    suffix = "/files/update"
     public_key=config.GLOBAL_CONFIG['public_key']
     #global username, password, public_key, shared_key
     cipher_username, cipher_filename, pwd = header_enc(filename)
@@ -146,9 +132,6 @@ def edit(filename,updated_content):
 
     all_message = "update" + username_hashed + cipher_filename + ciphertext
     message_bytes = all_message.encode('utf-8')
-    shared_key_bytes = shared_key.encode('utf-8')
-    h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
-    hmac_result = h.hexdigest()
     signature_raw = sign(message_bytes)
     signature = base64.b64encode(signature_raw).decode('utf-8')
 
@@ -158,7 +141,6 @@ def edit(filename,updated_content):
         "username": username_hashed,
         "content": ciphertext,
         "sign":signature,
-        "hmac": hmac_result
     }
     response_raw = requests.post(base_url + suffix, json=data_send, headers=headers)
     response = response_raw.json()
@@ -173,7 +155,7 @@ def share_starter(args):
     share(filename,to_user)
 
 def share(filename, to_user):
-    suffix = "/auth/message/send"
+    suffix = "/files/ask_share"
     username = config.GLOBAL_CONFIG['username']
 
     cipher_username, cipher_filename, pwd = header_enc(filename)
@@ -183,9 +165,6 @@ def share(filename, to_user):
 
     all_message = "share1" + username_hashed + cipher_filename +to_user_hashed
     message_bytes = all_message.encode('utf-8')
-    shared_key_bytes = config.GLOBAL_CONFIG['shared_key'].encode('utf-8')
-    h = hmac.new(shared_key_bytes, message_bytes, hashlib.sha256)
-    hmac_result = h.hexdigest()
 
     signature_raw = sign(message_bytes)
     signature = base64.b64encode(signature_raw).decode('utf-8')
@@ -195,20 +174,19 @@ def share(filename, to_user):
         "filename": cipher_filename,
         "username": username_hashed,
         "sign":signature,
-        "to_user": to_user_hashed,
-        "hmac": hmac_result
+        "to_user": to_user_hashed
     }
     response_raw = requests.post(base_url + suffix, json=data_send, headers=headers)
     response = response_raw.json()
-    content=response['content']
-    ano_public_key_pem=response['public_key']
+    content=response.get('encrypted_content', response.get('content', ''))
+    ano_public_key_pem=response.get('target_public_key', response.get('public_key', ''))
     ano_public_key=serialization.load_pem_public_key(ano_public_key_pem)
     cipher_content=encrypt_with_public_key(content, ano_public_key).hex()
     confirm_share(filename,to_user,cipher_content,ano_public_key)
 
 def confirm_share(filename,to_user,cipher_content,ano_public_key):
 
-    suffix = "/auth/message/send"
+    suffix = "/files/confirm_share"
     username = config.GLOBAL_CONFIG['username']
     private_key=config.GLOBAL_CONFIG['private_key']
 
@@ -218,9 +196,6 @@ def confirm_share(filename,to_user,cipher_content,ano_public_key):
 
     all_message2 = "share2" + username_hashed + cipher_filename + to_user_hashed
     message_bytes2 = all_message2.encode('utf-8')
-    shared_key_bytes2 = config.GLOBAL_CONFIG['shared_key'].encode('utf-8')
-    h2 = hmac.new(shared_key_bytes2, message_bytes2, hashlib.sha256)
-    hmac_result2 = h2.hexdigest()
 
     signature_raw = sign(message_bytes2)
     signature = base64.b64encode(signature_raw).decode('utf-8')
@@ -234,12 +209,11 @@ def confirm_share(filename,to_user,cipher_content,ano_public_key):
         "filename":cipher_filename,
         "username": username_hashed,
         "to_user": to_user_hashed,
-        "hmac": hmac_result2,
         "sign":signature
     }
     response_raw = requests.post(base_url + suffix, json=data_send_2, headers=headers)
     response = response_raw.json()
     if response["status"] == "success":
-        print("File updated successfully.")
+        print("File shared successfully.")
     else:
-        print(f"Update failed: {response.get('file', 'Unknown error')}")
+        print(f"Share failed: {response.get('file', 'Unknown error')}")
