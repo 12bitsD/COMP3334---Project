@@ -9,7 +9,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.String(64), unique=True, nullable=False)  # 客户端生成的用户ID哈希值
     password_hash = db.Column(db.String(128), nullable=False)  # 客户端生成的密码哈希值
-    public_key = db.Column(db.Text, nullable=False)  # 用户的公钥
+    public_key = db.Column(db.LargeBinary, nullable=False)  # 用户的公钥
     email = db.Column(db.String(120), unique=True, nullable=True)  # 用户邮箱（可选）
     otp = db.Column(db.String(16), nullable=True)  # 临时OTP码
     otp_expires_at = db.Column(db.DateTime, nullable=True)  # OTP过期时间

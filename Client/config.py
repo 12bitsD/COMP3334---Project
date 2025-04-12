@@ -1,7 +1,9 @@
 GLOBAL_CONFIG = {
-    'username':"",
-    'password':"",
+    'username':"ss",
+    'password':"123456",
     'loginStatus':False,
+    'admin':False,
+    'base_url' : "http://localhost:5000",
 }
 
 

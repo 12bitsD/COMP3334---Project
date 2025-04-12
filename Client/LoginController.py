@@ -3,156 +3,156 @@ import json
 import sys
 import requests
 import config
+from CryptographyController import *
+import base64
+import os
 
-username = config.GLOBAL_CONFIG['username']
-password = config.GLOBAL_CONFIG['password']
-loginStatus = config.GLOBAL_CONFIG['loginStatus']
+headers = {"Content-Type": "application/json"}
+base_url = config.GLOBAL_CONFIG['base_url']
 
-base_url = "http://localhost:5000"
-
-def sendAndRev(data):
-    action = data.get("action", "")
-    
-    if action == "register":
-        response = requests.post(f"{base_url}/auth/register", json={
-            "user_id": data["username"], 
-            "password_hash": data["password"],
-            "public_key": config.GLOBAL_CONFIG.get('public_key', ""),
-            "email": data.get("email", "")
-        })
-    elif action == "reset":
-        if "password" in data:
-            response = requests.post(f"{base_url}/auth/reset_password", json={
-                "user_id": data["username"],
-                "new_password_hash": data["password"]
-            })
-        else:
-            response = requests.post(f"{base_url}/auth/request_reset", json={
-                "user_id": data["username"]
-            })
-    elif action == "AuthenticateOTP":
-        response = requests.post(f"{base_url}/auth/verify_otp", json={
-            "otp": data["otp"]
-        })
-    elif action in ["upload", "ask_share", "confirm_share"]:
-        response = requests.post(f"{base_url}/files/{action}", json=data)
-    elif action == "download":
-        username = data["username"]
-        auth = data["auth"]
-        filename = data["filename"]
-        response = requests.get(f"{base_url}/files/download", params={
-            "username": username,
-            "auth": auth,
-            "filename": filename,
-            "hmac": data.get("hmac", "")
-        })
-    elif action == "delete":
-        username = data["username"]
-        auth = data["auth"]
-        filename = data["filename"]
-        response = requests.delete(f"{base_url}/files/delete", params={
-            "username": username,
-            "auth": auth,
-            "filename": filename,
-            "hmac": data.get("hmac", "")
-        })
-    else:
-        # Default fallback
-        response = requests.post(f"{base_url}/api", json=data)
-    
-    return response.json()
-
-
-def help(admin=False):
-    print("register <username> <password> <email_address> <confirm_password> (register a user)")
-    print("login <username> <password> (login with username and password)")
-    print("reset <username> <password> (reset the password of a user)")
-    print(
-        "upload <from_file_path> <to_file_path> (upload file from local to system)")  # must log all the action(login, logout, upload, delete, share)
-    print("download <from_file_path> <to_file_path> (download file from system to local)")
-    print("delete <file_path> (delete the file in the system)")
-    print("share <file_path> <shared_user> (share the specific file with specific user)")
-    print("edit <file_path> (editing files in the system)")
-    print("exit (exit the program)")
-    if admin:
-        print("log <username> (print all the log of a specific user)")
-
-
-def reset(args):
-    data = {"action": "reset", "username": args.username}
-    response = sendAndRev(data)
-    if response["status"] == "pending":
-        otp = input("input the otp sent to your email.")
-        data = {"action": "AuthenticateOTP", "otp": otp}
-        response = sendAndRev(data)
-        if response["status"] == "success":
-            ctr = 0
-            newpwd = input("input the new password.")
-            cfmpwd = input("confirm the new password.")
-            while newpwd != cfmpwd and ctr < 4:
-                print("New passwords do not match.")
-                newpwd = input("input the new password.")
-                cfmpwd = input("confirm the new password.")
-                ctr += 1
-            if (ctr < 4):
-                pwd = hashlib.sha256(newpwd.encode()).hexdigest()
-                data = {"action": "reset", "username": args.username, "password": pwd}
-                response = sendAndRev(data)
-                if response["status"] == "success":
-                    print("Password has been reset.")
+def init(password):
+    #print('success')
+    # 使用绝对路径
+    keypair_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "keypair.json")
+    try:
+        with open(keypair_path, 'r') as f:
+            keypair = json.load(f)
+            #print('success')
+            if keypair['metadata'] is None:
+                dk_salt = os.urandom(16)
+                dk = derive_key(password, dk_salt)
+                print(dk)
+                #print('success')
+                private_key_pem, public_key_pem = generate_keys()
+                private_key = load_private_key(private_key_pem)
+                ciphertext,nonce,enc_salt = encrypt(dk, base64.b64encode(private_key_pem).decode('utf-8'))
+                public_key = load_public_key(public_key_pem)
+                keypair = {
+                    'metadata': "Secure",
+                    'private_key': base64.b64encode(ciphertext).decode('utf-8'),
+                    'public_key': base64.b64encode(public_key_pem).decode('utf-8'),
+                    "dk_salt": base64.b64encode(dk_salt).decode('utf-8'),
+                    'enc_salt': base64.b64encode(enc_salt).decode('utf-8'),
+                    "nonce": base64.b64encode(nonce).decode('utf-8'),
+                }
+                print(keypair)
+                with open(keypair_path, 'w', encoding = 'utf-8') as file:
+                    json.dump(keypair,file, indent=4)
             else:
-                print("Too many attempts, try again.")
-        else:
-            print("OTP authentication unsuccessful.")
+                dk_salt = base64.b64decode(keypair['dk_salt'])
+                dk = derive_key(password, dk_salt)
+                print(dk)
+                print(keypair)
+                private_key = load_private_key(
+                    base64.b64decode(
+                        decrypt(
+                            dk,
+                            base64.b64decode(keypair['private_key']),
+                            base64.b64decode(keypair['nonce'])
+                        ),
+                    )
+                )
+                public_key = load_public_key(base64.b64decode(keypair['public_key']))
+    except FileNotFoundError:
+        # 文件不存在，创建包含空元数据的文件
+        with open(keypair_path, 'w', encoding = 'utf-8') as file:
+            json.dump({"metadata": None}, file, indent=4)
+        
+        # 使用新文件重新运行init
+        return init(password)
+    
+    config.GLOBAL_CONFIG['private_key'] = private_key
+    config.GLOBAL_CONFIG['public_key'] = public_key
+
+
+def reset_password(args):
+    suffix = "/change_password"
+    user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
+    pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
+    new_password = hashlib.sha256(f"{args.new_password}".encode("utf-8")).hexdigest()
+    signature_raw = sign(user_id.encode("utf-8") + pwd.encode("utf-8") + new_password.encode("utf-8"))
+    signature = base64.b64encode(signature_raw).decode('utf-8')
+    data = {'user_id': user_id,'current_password_hash':pwd,'new_password_hash':new_password,'signature':signature}
+    response_raw = requests.post(base_url + suffix, data=data, headers=headers)
+    response = response_raw.json()
+    print(response['message'])
+
+
+def reset(args):   #extra revised needed
+    suffix = "/otp/request"
+    user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
+    data = {"user_id": user_id}
+    response_raw = requests.post(base_url + suffix, headers=headers, data=data) #request otp
+    response = response_raw.json()
+    if response["status"] == "success":
+        otp = input("Input the otp sent to your email.")
+        new_password = hashlib.sha256(f"{args.new_password}".encode("utf-8")).hexdigest()
+        suffix = "/reset" #authenticate otp
+        signature = sign(user_id + new_password).decode("utf-8")
+        data = {'user_id': user_id,'password': otp,'new_password_hash':new_password,'signature':signature}
+        response_raw = requests.post(base_url + suffix, headers=headers, data=data)
+        response = response_raw.json()
+        if response["status"] == "success":
+            print(response["file"])
     else:
         print("Unknown error.")
 
+def changeStatus(data,username,password,suffix):
+    response_raw = requests.post(base_url + suffix, headers=headers, json=data)
+    response = response_raw.json()
+    if response["status"] == "success":
+        config.GLOBAL_CONFIG['username'] = username
+        config.GLOBAL_CONFIG['password'] = password
+        config.GLOBAL_CONFIG['loginStatus'] = True
+    print(response["message"])
+    return response['status'] == 'success' , response
+
 
 def register(args):
+    suffix = "/auth/register"
+    status = False
     if args.password != args.confirm_password:
         print("password mismatch, please try again")
     else:
-        print(f"Registering user: {args.username}......")
+        print(f"Registering user: {args.username}")
+        init(args.password)
         pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
-        usrnm = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
-        data = {"action": "register", "username": usrnm, "password": pwd, "email": args.email}
-        response = sendAndRev(data)
-        if response["status"] == "success":
-            print("user registered")
-        else:
-            print(f"{response['file']}")
+        user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
+        
+        
+        data = {"user_id": user_id,
+                "password_hash": pwd,
+                "public_key": 111,
+                "email": args.email}
+        status,response = changeStatus(data,args.username,args.password,suffix)
+
 
 def exit():
     sys.exit()
 
 def login(args):
-    print("logging...")
+    suffix = "/login"
+    print(f"{args.username} logging...")
     pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
-    usrnm = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
-    data = {
-        "user_id": usrnm,
-        "password_hash": pwd
-    }
-    response = requests.post(f"{base_url}/auth/login", json=data).json()
-    if response["status"] == "success":
-        print("user logged in")
-        global username
-        username = args.username
-        global password
-        password = args.password
-        global loginStatus
-        loginStatus = True
-        return True
-    return False
+    user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
+    signature_raw = sign(user_id.encode("utf-8") + pwd.encode("utf-8"))
+    signature = base64.b64encode(signature_raw).decode('utf-8')
+    data = {"user_id": user_id, "password_hash": pwd,"signature":signature}
+    status,response = changeStatus(data,args.username,args.password,suffix)
+    if status and response['admin']:
+        config.GLOBAL_CONFIG['admin'] = True
 
 
 def log(args):
+    if not config.GLOBAL_CONFIG['admin']:
+        print("No access privileged")
+        return
     print(f"Fetching logs for user: {args.username}")
-    username_hash = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
-    response = requests.get(f"{base_url}/utilities/logs", params={"user_id": username_hash}).json()
+    user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
+    suffix = "/logs?user_id="+user_id
+    response_raw = requests.get(base_url + suffix, headers=headers)
+    response = response_raw.json()
     if response["status"] == "success":
-        logs = response.get("logs", [])
-        for log in logs:
-            print(log)
+        print(response["logs"])
     else:
-        print(f"Error fetching logs: {response.get('file', 'Unknown error')}")
+        print(response["file"])

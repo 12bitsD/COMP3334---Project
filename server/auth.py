@@ -127,13 +127,7 @@ def verify_user_credentials(user_id, password_hash):
     # 验证成功情况2: OTP匹配且未过期
     otp_correct = False
     if user.otp is not None and user.otp_expires_at is not None:
-        now = datetime.now(UTC)
-        expires_at = user.otp_expires_at
-        # 确保两个时间都带有时区信息
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=UTC)
-            
-        if now <= expires_at and user.otp == password_hash:
+        if datetime.now(UTC) <= user.otp_expires_at and user.otp == password_hash:
             otp_correct = True
             # OTP验证成功后清除OTP
             user.otp = None
@@ -294,7 +288,7 @@ def get_public_key():
             'file': 'Public key retrieved successfully',
             'data': {
                 'user_id': user.user_id,
-                'public_key': user.public_key
+                'public_key': user.public_key.decode('utf-8') if isinstance(user.public_key, bytes) else user.public_key
             }
         }), 200
     except Exception as e:
@@ -320,8 +314,8 @@ def change_password():
         }), status_code
     
     try:
-        # 更新密码哈希 - 使用password_hash字段
-        user.password_hash = data['password_hash']  # 修改这里，使用password_hash字段
+        # 更新密码哈希
+        user.password_hash = data['new_password_hash']
         db.session.commit()
         
         # 记录密码更改
