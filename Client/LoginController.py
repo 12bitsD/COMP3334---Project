@@ -1,49 +1,66 @@
 import hashlib
 import json
 import sys
-import socket
-import config
 import requests
+from crypto.SelfTest.Protocol.test_ecdh import private_key
 
-username = config.GLOBAL_CONFIG['username']
-password = config.GLOBAL_CONFIG['password']
-loginStatus = config.GLOBAL_CONFIG['loginStatus']
+import config
+from CryptographyController import *
 
-base_url = "http://localhost:5000"
+headers = {"Content-Type": "application/json"}
+base_url = config.GLOBAL_CONFIG['base_url']
 
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect(("127.0.0.1",8080))
+def init(password):
+    dk_salt = os.urandom(16)
+    dk = derive_key(password,dk_salt)
+    with open("keypair.json",'r') as f:
+        keypair = json.load(f)
+        if keypair['metadata'] is None:
+            salt = os.urandom(16)
+            private_key_pem, public_key_pem = generate_keys()
+            private_key = load_private_key(private_key_pem)
+            ciphertext,nonce,enc_salt = encrypt(dk, private_key_pem.decode('utf-8'))
+            public_key = load_public_key(public_key_pem)
+            keypair = {
+                'metadata': "Secure",
+                'private_key': ciphertext.decode('utf-8'),
+                'public_key': public_key_pem.decode('utf-8'),
+                "dk_salt": dk_salt.decode('utf-8'),
+                'enc_salt': enc_salt.decode('utf-8'),
+                "nonce": nonce.decode('utf-8'),
+            }
+            with open('keypair.json', 'w', encoding = 'utf-8') as file:
+                json.dump(keypair,file, indent=4)
+        else:
+            private_key = load_private_key(decrypt(keypair['private_key'],dk_salt,keypair['nonce'].encode('utf-8')).encode('utf-8'))
+            public_key = load_public_key(keypair['public_key'].encode('utf-8'))
+    config.GLOBAL_CONFIG['private_key'] = private_key
+    config.GLOBAL_CONFIG['public_key'] = public_key
 
-def sendAndRev(data):
-    client.sendall(json.dumps(data).encode())
-    response = json.loads(client.recv(4096).decode())
-    return response
+
+def reset_password(args):
+    suffix = "/auth/change_password"
+    user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest().encode()
+    pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest().encode()
+    new_password = hashlib.sha256(f"{args.new_password}".encode("utf-8")).hexdigest().encode()
+    signature = sign(user_id + pwd + new_password).decode("utf-8")
+    data = {'user_id': user_id,'current_password_hash':pwd,'new_password_hash':new_password,'signature':signature}
+    response_raw = requests.post(base_url + suffix, data=json.dumps(data), headers=headers)
+    response = response_raw.json()
+    print(response['message'])
 
 
-def help(admin=False):
-    print("register <username> <password> <email_address> <confirm_password> (register a user)")
-    print("login <username> <password> (login with username and password)")
-    print("reset <username> <password> (reset the password of a user)")
-    print(
-        "upload <from_file_path> <to_file_path> (upload file from local to system)")  # must log all the action(login, logout, upload, delete, share)
-    print("download <from_file_path> <to_file_path> (download file from system to local)")
-    print("delete <file_path> (delete the file in the system)")
-    print("share <file_path> <shared_user> (share the specific file with specific user)")
-    print("edit <file_path> (editing files in the system)")
-    print("exit (exit the program)")
-    if admin:
-        print("log <username> (print all the log of a specific user)")
-
-
-def reset(args):
-    data = {"action": "reset", "username": args.username}
-    client.sendall(json.dumps(data).encode())
-    response = json.loads(client.recv(1024).decode())
-    if response["status"] == "pending":
-        otp = input("input the otp sent to your email.")
-        data = {"action": "AuthenticateOTP", "otp": otp}
-        client.sendall(json.dumps(data).encode())
-        response = json.loads(client.recv(1024).decode())
+def reset(args):   #extra revised needed
+    suffix = "/auth/reset"
+    user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
+    data = {"user_id": user_id}
+    response_raw = requests.post(base_url + suffix, headers=headers, data=json.dumps(data))
+    response = response_raw.json()
+    if response["status"] == "success":
+        otp = input("Input the otp sent to your email.")
+        data = {"otp": otp}
+        suffix = "/auth/auth_otp"
+        response_raw = requests.post(base_url + suffix, headers=headers, data=json.dumps(data))
         if response["status"] == "success":
             ctr = 0
             newpwd = input("input the new password.")
@@ -53,11 +70,12 @@ def reset(args):
                 newpwd = input("input the new password.")
                 cfmpwd = input("confirm the new password.")
                 ctr += 1
-            if (ctr < 4):
+            if ctr < 4:
                 pwd = hashlib.sha256(newpwd.encode()).hexdigest()
-                data = {"action": "reset", "username": args.username, "password": pwd}
-                client.sendall(json.dumps(data).encode())
-                response = json.loads(client.recv(1024).decode())
+                suffix = "/auth/otp_change_password"
+                data = {"user_id": user_id, "password": pwd}
+                response_raw = requests.post(base_url + suffix, headers=headers, data=json.dumps(data))
+                response = response_raw.json()
                 if response["status"] == "success":
                     print("Password has been reset.")
             else:
@@ -67,43 +85,48 @@ def reset(args):
     else:
         print("Unknown error.")
 
+def changeStatus(data,username,password,suffix):
+    response_raw = requests.post(base_url + suffix, headers=headers, data=json.dumps(data))
+    response = response_raw.json()
+    if response["status"] == "success":
+        config.GLOBAL_CONFIG['username'] = username
+        config.GLOBAL_CONFIG['password'] = password
+        config.GLOBAL_CONFIG['loginStatus'] = True
+    print(response["message"])
+    return response['status'] == 'success'
+
 
 def register(args):
+    suffix = "/auth/register"
+    status = False
     if args.password != args.confirm_password:
         print("password mismatch, please try again")
     else:
-        print(f"Registering user: {args.username}......")
+        print(f"Registering user: {args.username}")
         pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
-        usrnm = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
-        data = {"action": "register", "username": usrnm, "password": pwd, "email": args.email}
-        client.sendall(json.dumps(data).encode())
-        response = json.loads(client.recv(1024).decode())
-        if response["status"] == "success":
-            print("user registered")
-        else:
-            print(f"{response['message']}")
+        user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
+        signature = sign(user_id + pwd).decode("utf-8")
+        data = {"user_id": user_id,
+                "password_hash": pwd,
+                "public_key": config.GLOBAL_CONFIG['public_key'],
+                "email": args.email,
+                "signature":signature}
+        status = changeStatus(data,args.username,args.password,suffix)
+    if status:
+        init(args.password)
+
 
 def exit():
     sys.exit()
 
 def login(args):
-    print("logging...")
+    suffix = "/auth/login"
+    print(f"{args.username} logging...")
     pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
-    usrnm = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
-    data = {"action": "login", "username": usrnm, "password": pwd}
-    client.sendall(json.dumps(data).encode())
-    response = json.loads(client.recv(1024).decode())
-    if response["status"] == "success":
-        print("user logged in")
-        global username
-        username = args.username
-        global password
-        password = args.password
-        global loginStatus
-        loginStatus = True
-        return True
-    return False
-
+    user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
+    signature = sign(user_id + pwd).decode("utf-8")
+    data = {"user_id": user_id, "password_hash": pwd,"signature":signature}
+    changeStatus(data,args.username,args.password,suffix)
 
 def log(args):
     print(f"Fetching logs for user: {args.username}")
