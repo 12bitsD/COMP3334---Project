@@ -181,10 +181,11 @@ def register():
         
     try:
         # 创建新用户，email字段为可选
+        # 公钥已经是字符串形式，直接存储
         new_user = User(
             user_id=data['user_id'],
             password_hash=data['password_hash'],
-            public_key=data['public_key'],
+            public_key=data['public_key'],  # 直接存储字符串形式的公钥
             email=data.get('email'),  # 如果email不存在，默认为None
         )
         
@@ -288,7 +289,7 @@ def get_public_key():
             'file': 'Public key retrieved successfully',
             'data': {
                 'user_id': user.user_id,
-                'public_key': user.public_key.decode('utf-8') if isinstance(user.public_key, bytes) else user.public_key
+                'public_key': user.public_key  # 直接返回公钥字符串
             }
         }), 200
     except Exception as e:

@@ -163,7 +163,7 @@ def ask_share():
         return jsonify({
             'status': 'success',
             'file': 'Obtained target user public key',
-            'target_public_key': target_user.public_key,
+            'target_public_key': target_user.public_key,  # 直接返回字符串形式的公钥
             'encrypted_content': F.encrypted_content
         }), 200
             
