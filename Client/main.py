@@ -3,8 +3,9 @@ from LoginController import *
 import argparse
 import shlex
 import config
+import traceback
 
-def help():
+def help(args):
     print("register <username> <password> <confirm_password> <email_address> (register a user)")
     print("login <username> <password> (login with username and password)")
     print("reset <username> <password> (reset the password of a user)")
@@ -39,8 +40,8 @@ def cmd():
     register_parser = subparsers.add_parser("register")
     register_parser.add_argument("username")
     register_parser.add_argument("password")
-    register_parser.add_argument("email")
     register_parser.add_argument("confirm_password")
+    register_parser.add_argument("email")
     register_parser.set_defaults(func=register)
 
     login_parser = subparsers.add_parser("login")
@@ -94,6 +95,7 @@ def cmd():
         except SystemExit:
             print("Invalid command. Type 'help' for usage information.")
         except Exception as e:
+            traceback.print_exc()
             print(f"Error: {e}")
 
 if __name__ == '__main__':
