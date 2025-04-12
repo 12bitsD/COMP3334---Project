@@ -2,8 +2,6 @@ import hashlib
 import json
 import sys
 import requests
-from crypto.SelfTest.Protocol.test_ecdh import private_key
-
 import config
 from CryptographyController import *
 
@@ -51,37 +49,21 @@ def reset_password(args):
 
 
 def reset(args):   #extra revised needed
-    suffix = "/reset"
+    suffix = "/otp/request"
     user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
     data = {"user_id": user_id}
-    response_raw = requests.post(base_url + suffix, headers=headers, data=json.dumps(data))
+    response_raw = requests.post(base_url + suffix, headers=headers, data=json.dumps(data)) #request otp
     response = response_raw.json()
     if response["status"] == "success":
         otp = input("Input the otp sent to your email.")
-        data = {"otp": otp}
-        suffix = "/auth/auth_otp"
+        new_password = hashlib.sha256(f"{args.new_password}".encode("utf-8")).hexdigest()
+        suffix = "/reset" #authenticate otp
+        signature = sign(user_id + new_password).decode("utf-8")
+        data = {'user_id': user_id,'password': otp,'new_password_hash':new_password,'signature':signature}
         response_raw = requests.post(base_url + suffix, headers=headers, data=json.dumps(data))
+        response = response_raw.json()
         if response["status"] == "success":
-            ctr = 0
-            newpwd = input("input the new password.")
-            cfmpwd = input("confirm the new password.")
-            while newpwd != cfmpwd and ctr < 4:
-                print("New passwords do not match.")
-                newpwd = input("input the new password.")
-                cfmpwd = input("confirm the new password.")
-                ctr += 1
-            if ctr < 4:
-                pwd = hashlib.sha256(newpwd.encode()).hexdigest()
-                suffix = "/auth/otp_change_password"
-                data = {"user_id": user_id, "password": pwd}
-                response_raw = requests.post(base_url + suffix, headers=headers, data=json.dumps(data))
-                response = response_raw.json()
-                if response["status"] == "success":
-                    print("Password has been reset.")
-            else:
-                print("Too many attempts, try again.")
-        else:
-            print("OTP authentication unsuccessful.")
+            print(response["file"])
     else:
         print("Unknown error.")
 
