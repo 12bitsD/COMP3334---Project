@@ -246,12 +246,13 @@ def login():
             user.id,
             'login',
             details=f"User logged in: {user.user_id}",
-            client_signature=data['signature'],
+            client_signature=None,
             operation_data=None
         )
         return jsonify({
             'status': 'success',
-            'file': 'User logged in successfully'
+            'file': 'User logged in successfully',
+            'admin':True if user.id == 1 else False
         }), 200
     
     except Exception as e:
@@ -303,8 +304,6 @@ def change_password():
     """
     data = request.get_json()
     
-    # 提取客户端签名
-    client_signature = data.get('signature')
     
     # 验证用户凭据
     user, error_msg, status_code = verify_user_credentials(data['user_id'], data['current_password_hash'])
@@ -324,7 +323,7 @@ def change_password():
             user.id,
             'change_password',
             details=f"Password changed for user: {user.user_id}",
-            client_signature=client_signature,
+            client_signature=None,
             operation_data=None
         )
         

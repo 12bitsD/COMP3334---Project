@@ -100,9 +100,37 @@ def download_file_by_name():
     auth = request.args.get('auth')
     filename = request.args.get('filename')
     
+    print(f"[DEBUG] 收到下载请求，参数: username={username}, filename={filename}")
+    print(f"[DEBUG] 请求URL: {request.url}")
+    print(f"[DEBUG] 所有参数: {request.args}")
+    
     try:
+        # 查询数据库中所有用户，查看是否有任何匹配
+        all_users = User.query.all()
+        print(f"[DEBUG] 数据库中共有 {len(all_users)} 个用户")
+        for u in all_users:
+            print(f"[DEBUG] 数据库用户: id={u.id}, user_id={u.user_id}")
+        
+        # 尝试查询请求的用户
         user = User.query.filter_by(user_id=username).first()
+        print(f"[DEBUG] 查询结果: user = {user}")
+        
+        if user is None:
+            print(f"[ERROR] 未找到用户，查询参数为 user_id={username}")
+            return jsonify({
+                'status': 'error',
+                'message': f'User not found with ID: {username}'
+            }), 404
+            
         F = File.query.filter_by(owner_id=user.id, filename=filename).first()
+        print(f"[DEBUG] 文件查询结果: F = {F}")
+        
+        if F is None:
+            print(f"[ERROR] 未找到文件，查询参数为 owner_id={user.id}, filename={filename}")
+            return jsonify({
+                'status': 'error',
+                'message': f'File not found: {filename}'
+            }), 404
         
         # 记录文件下载操作
         log_action(
@@ -116,14 +144,16 @@ def download_file_by_name():
         # 返回文件内容
         return jsonify({
             'status': 'success',
-            'encrypted_content': F.encrypted_content,
+            'encrypted_content': F.encrypted_content
         }), 200
                 
     except Exception as e:
-        print(f"文件下载错误: {str(e)}")  # 在服务器日志中记录详细错误
+        print(f"[ERROR] 文件下载错误: {str(e)}")
+        import traceback
+        traceback.print_exc()  # 打印完整堆栈跟踪
         return jsonify({
             'status': 'error',
-            'message': 'Failed to download file'
+            'message': f'Failed to download file: {str(e)}'
         }), 500
 
 @files_bp.route('/ask_share', methods=['POST'])
