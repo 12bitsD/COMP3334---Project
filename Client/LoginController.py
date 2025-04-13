@@ -130,11 +130,12 @@ def reset(args):   #extra revised needed
         suffix = "/auth/reset" #authenticate otp
         #signature = sign(user_id + new_password).decode("utf-8")
         data = {'user_id': user_id,'current_password_hash': otp,'new_password_hash':new_password,"signature":"unsign"}
-        response_raw_2 = requests.post(base_url + suffix, headers=headers, json=data)
+        response_raw_2 = requests.post(base_url + suffix, headers=headers, json=data, timeout=10)
         response_2 = response_raw_2.json()
         if response_2["status"] == "success":
             reset_local(user_id,args.password,args.new_password)
-            print(response["file"])
+            print(response_2['file']+"\nPlease login again.")
+            config.GLOBAL_CONFIG['loginStatus'] = False
     else:
         print("Unknown error.")
 

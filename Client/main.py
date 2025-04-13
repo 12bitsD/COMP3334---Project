@@ -8,7 +8,7 @@ import traceback
 def help(args):
     print("register <username> <password> <confirm_password> <email_address> (register a user)")
     print("login <username> <password> (login with username and password)")
-    print("reset <username> <password> (reset the password of a user)")
+    print("reset <username> <password> <confirm_password> (reset the password of a user)")
     print("reset_password <username> <password> <confirm_password> (reset the password of a user when knowing your origin password)>")
     print("upload <from_file_path> <to_file_path> (upload file from local to system)")  # must log all the action(login, logout, upload, delete, share)
     print("download <from_file_path> <to_file_path> (download file from system to local)")
