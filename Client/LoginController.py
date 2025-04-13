@@ -1,6 +1,5 @@
 import hashlib
 import json
-import pwd
 import sys
 import requests
 
@@ -105,12 +104,9 @@ def reset_password(args):
     #print("password:"+args.password)
     #print("username:"+args.username)
     user_id = hashlib.sha256(f"{args.username}".encode("utf-8")).hexdigest()
-    pwd = hashlib.sha256(f"{args.new_password}".encode("utf-8")).hexdigest()
+    pwd = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
     new_password = hashlib.sha256(f"{args.new_password}".encode("utf-8")).hexdigest()
-    init(args.username,args.password)
-    signature_raw = sign(user_id.encode("utf-8") + pwd.encode("utf-8"))
-    signature = base64.b64encode(signature_raw).decode('utf-8')
-    data = {'user_id': user_id,'current_password_hash':pwd,'new_password_hash':new_password,"signature":signature}
+    data = {'user_id': user_id,'current_password_hash':pwd,'new_password_hash':new_password,'signature':"unsign"}
     response_raw = requests.post(base_url + suffix, json=data, headers=headers)
     response = response_raw.json()
     if response['status'] == 'success':
@@ -133,7 +129,7 @@ def reset(args):   #extra revised needed
         new_password = hashlib.sha256(f"{args.password}".encode("utf-8")).hexdigest()
         suffix = "/auth/reset" #authenticate otp
         #signature = sign(user_id + new_password).decode("utf-8")
-        data = {'user_id': user_id,'password': otp,'new_password_hash':new_password}
+        data = {'user_id': user_id,'current_password_hash': otp,'new_password_hash':new_password,"signature":"unsign"}
         response_raw_2 = requests.post(base_url + suffix, headers=headers, json=data)
         response_2 = response_raw_2.json()
         if response_2["status"] == "success":
