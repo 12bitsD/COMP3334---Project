@@ -12,10 +12,10 @@ base_url = config.GLOBAL_CONFIG['base_url']
 
 def header_enc(filename):
     cipher_username = encrypt_with_public_key(config.GLOBAL_CONFIG['username'], config.GLOBAL_CONFIG['public_key']).hex()
-    print("filename",filename)
+    #print("filename",filename)
     #cipher_filename = encrypt_with_public_key(filename, config.GLOBAL_CONFIG['public_key']).hex()
     cipher_filename = hashlib.sha256(f"{filename}".encode("utf-8")).hexdigest()
-    print("filename_hashed",cipher_filename)
+    #print("filename_hashed",cipher_filename)
     pwd = hashlib.sha256(f"{config.GLOBAL_CONFIG['password']}".encode("utf-8")).hexdigest()
     return cipher_username, cipher_filename, pwd
 
@@ -92,7 +92,7 @@ def download(filename):
     }
     response_raw = requests.get(base_url + suffix, params=data_send, headers=headers)
     response = response_raw.json()
-    print(response.get('file', response.get('message', 'No message')))
+    #print(response.get('file', response.get('message', 'No message')))
     #提取里面的 content
     encrypted_content = bytes.fromhex(response["encrypted_content"])
     decrypted_text = decrypt_with_private_key(encrypted_content, config.GLOBAL_CONFIG['private_key'])
